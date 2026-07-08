@@ -16,7 +16,7 @@ const FAQS = [
   {
     question: '¿Cómo invito a otro administrador?',
     answer:
-      'En "Equipo" usa el botón "Invitar administrador". La persona invitada debe registrarse y luego ingresar el código de administrador en /redeem para activar su acceso.',
+      'En "Equipo" usa el botón "Invitar administrador". La persona invitada recibe un correo y, al registrarse con ese enlace, su acceso de administrador se activa automáticamente.',
   },
   {
     question: '¿Por qué una gira no aparece en el mapa operativo?',

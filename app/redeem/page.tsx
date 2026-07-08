@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Ticket, ArrowRight, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,28 @@ export default function RedeemPage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [checkingInvite, setCheckingInvite] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      const res = await fetch('/api/v1/auth/claim-invite', { method: 'POST' })
+      if (cancelled) return
+      if (res.ok) {
+        const data = await res.json()
+        if (data.granted) {
+          router.push('/admin')
+          return
+        }
+      }
+      setCheckingInvite(false)
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -40,6 +62,14 @@ export default function RedeemPage() {
     if (data.role === 'ADMIN') router.push('/admin')
     else if (data.role === 'MONITOR') router.push(`/monitor/${data.tripId}`)
     else router.push(`/parent/${data.tripId}`)
+  }
+
+  if (checkingInvite) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
+        <span className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (

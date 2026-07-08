@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { MailPlusIcon, Trash2Icon } from 'lucide-react'
+import { MailPlusIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { SiteHeader } from '@/components/site-header'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type Person = { clerkUserId: string; name: string; email: string; imageUrl: string }
 type Admin = Person & { createdAt: string; isCurrentUser: boolean }
-type Monitor = Person & { trips: { id: string; name: string }[] }
+type Monitor = Person & { trips: { membershipId: string; id: string; name: string }[] }
 
 function initialsFor(name: string) {
   return name
@@ -83,6 +83,12 @@ export default function AdminTeamPage() {
     if (res.ok) void load()
   }
 
+  async function handleRemoveMonitorTrip(tripId: string, membershipId: string) {
+    if (!window.confirm('¿Quitar a este monitor de la gira?')) return
+    const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
+    if (res.ok) void load()
+  }
+
   return (
     <>
       <SiteHeader
@@ -100,8 +106,8 @@ export default function AdminTeamPage() {
               <DialogHeader>
                 <DialogTitle>Invitar administrador</DialogTitle>
                 <DialogDescription>
-                  Se enviará una invitación por correo. La persona invitada debe registrarse y luego
-                  ingresar el código de administrador en /redeem para activar su acceso.
+                  Se enviará una invitación por correo. Al registrarse con ese enlace, su acceso de
+                  administrador se activa automáticamente.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex flex-col gap-2">
@@ -189,8 +195,16 @@ export default function AdminTeamPage() {
                       </div>
                       <div className="flex flex-wrap justify-end gap-1">
                         {monitor.trips.map((trip) => (
-                          <Badge key={trip.id} variant="secondary">
+                          <Badge key={trip.membershipId} variant="secondary" className="gap-1 pr-1">
                             {trip.name}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMonitorTrip(trip.id, trip.membershipId)}
+                              className="rounded-full p-0.5 hover:bg-foreground/10"
+                            >
+                              <XIcon className="size-3" />
+                              <span className="sr-only">Quitar de esta gira</span>
+                            </button>
                           </Badge>
                         ))}
                       </div>

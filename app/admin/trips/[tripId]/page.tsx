@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { CheckIcon, CopyIcon, PencilIcon, Trash2Icon, UserPlusIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
+import { differenceInCalendarDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import type { AccessCode, Announcement, ItineraryItem, LocationPing, Role, Trip, TripStatus } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
@@ -30,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
 import { itineraryStatusLabels, announcementTypeLabels, tripStatusLabels } from '@/lib/labels'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
@@ -41,7 +43,8 @@ type ParentRow = { id: string; name: string; email: string }
 const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'EMERGENCY', 'FINISHED']
 const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
 
-const EMPTY_EDIT_FORM = { name: '', destination: '', totalDays: '', studentCount: '' }
+const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '' }
+const EMPTY_ITINERARY_FORM = { time: '', title: '', location: '', description: '' }
 
 export default function AdminTripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>()
@@ -59,6 +62,11 @@ export default function AdminTripDetailPage() {
   const [editDateRange, setEditDateRange] = useState<DateRange | undefined>()
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [itineraryOpen, setItineraryOpen] = useState(false)
+  const [itineraryForm, setItineraryForm] = useState(EMPTY_ITINERARY_FORM)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [savingItinerary, setSavingItinerary] = useState(false)
+  const [itineraryError, setItineraryError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const [tripRes, itineraryRes, announcementsRes, locationRes, codesRes, rosterRes] = await Promise.all([
@@ -102,7 +110,6 @@ export default function AdminTripDetailPage() {
     setEditForm({
       name: trip.name,
       destination: trip.destination,
-      totalDays: String(trip.totalDays),
       studentCount: String(trip.studentCount),
     })
     setEditDateRange({ from: new Date(trip.startDate), to: new Date(trip.endDate) })
@@ -120,7 +127,6 @@ export default function AdminTripDetailPage() {
       body: JSON.stringify({
         name: editForm.name,
         destination: editForm.destination,
-        totalDays: Number(editForm.totalDays),
         studentCount: Number(editForm.studentCount),
         startDate: editDateRange.from.toISOString(),
         endDate: editDateRange.to.toISOString(),
@@ -156,6 +162,66 @@ export default function AdminTripDetailPage() {
     await navigator.clipboard.writeText(code)
     setCopiedId(id)
     window.setTimeout(() => setCopiedId((current) => (current === id ? null : current)), 1500)
+  }
+
+  function openCreateItinerary() {
+    setEditingItemId(null)
+    setItineraryForm(EMPTY_ITINERARY_FORM)
+    setItineraryError(null)
+    setItineraryOpen(true)
+  }
+
+  function openEditItinerary(item: ItineraryItem) {
+    setEditingItemId(item.id)
+    setItineraryForm({
+      time: item.time,
+      title: item.title,
+      location: item.location,
+      description: item.description,
+    })
+    setItineraryError(null)
+    setItineraryOpen(true)
+  }
+
+  async function handleSaveItinerary() {
+    setSavingItinerary(true)
+    setItineraryError(null)
+    const res = await fetch(
+      editingItemId
+        ? `/api/v1/trips/${tripId}/itinerary/${editingItemId}`
+        : `/api/v1/trips/${tripId}/itinerary`,
+      {
+        method: editingItemId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(itineraryForm),
+      }
+    )
+    setSavingItinerary(false)
+    if (res.ok) {
+      setItineraryOpen(false)
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      setItineraryError(data?.error?.message ?? 'No se pudo guardar el ítem.')
+    }
+  }
+
+  async function handleDeleteItinerary(itemId: string) {
+    if (!window.confirm('¿Eliminar este ítem del itinerario?')) return
+    const res = await fetch(`/api/v1/trips/${tripId}/itinerary/${itemId}`, { method: 'DELETE' })
+    if (res.ok) void load()
+  }
+
+  async function handleDeleteAnnouncement(id: string) {
+    if (!window.confirm('¿Eliminar este comunicado?')) return
+    const res = await fetch(`/api/v1/trips/${tripId}/announcements/${id}`, { method: 'DELETE' })
+    if (res.ok) void load()
+  }
+
+  async function handleRemoveParent(membershipId: string) {
+    if (!window.confirm('¿Quitar a este apoderado de la gira?')) return
+    const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
+    if (res.ok) void load()
   }
 
   if (!trip) {
@@ -206,15 +272,6 @@ export default function AdminTripDetailPage() {
                     />
                   </div>
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="edit-total-days">Días totales</Label>
-                    <Input
-                      id="edit-total-days"
-                      type="number"
-                      value={editForm.totalDays}
-                      onChange={(e) => setEditForm((p) => ({ ...p, totalDays: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
                     <Label htmlFor="edit-student-count">N° de alumnos</Label>
                     <Input
                       id="edit-student-count"
@@ -227,6 +284,12 @@ export default function AdminTripDetailPage() {
                 <div className="flex flex-col gap-2">
                   <Label>Fechas de la gira</Label>
                   <DateRangePicker value={editDateRange} onChange={setEditDateRange} />
+                  {editDateRange?.from && editDateRange?.to ? (
+                    <p className="text-xs text-muted-foreground">
+                      Duración: {differenceInCalendarDays(editDateRange.to, editDateRange.from) + 1} día
+                      {differenceInCalendarDays(editDateRange.to, editDateRange.from) + 1 === 1 ? '' : 's'}
+                    </p>
+                  ) : null}
                 </div>
                 {editError ? <p className="text-sm text-destructive">{editError}</p> : null}
               </div>
@@ -305,8 +368,73 @@ export default function AdminTripDetailPage() {
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Itinerario</CardTitle>
+              <Dialog open={itineraryOpen} onOpenChange={setItineraryOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={openCreateItinerary}>
+                    <PlusIcon />
+                    Agregar
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{editingItemId ? 'Editar ítem' : 'Nuevo ítem de itinerario'}</DialogTitle>
+                  </DialogHeader>
+                  <div className="flex flex-col gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="itinerary-time">Hora</Label>
+                        <Input
+                          id="itinerary-time"
+                          placeholder="09:00"
+                          value={itineraryForm.time}
+                          onChange={(e) => setItineraryForm((p) => ({ ...p, time: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="itinerary-title">Título</Label>
+                        <Input
+                          id="itinerary-title"
+                          value={itineraryForm.title}
+                          onChange={(e) => setItineraryForm((p) => ({ ...p, title: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="itinerary-location">Lugar</Label>
+                      <Input
+                        id="itinerary-location"
+                        value={itineraryForm.location}
+                        onChange={(e) => setItineraryForm((p) => ({ ...p, location: e.target.value }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="itinerary-description">Descripción</Label>
+                      <Textarea
+                        id="itinerary-description"
+                        value={itineraryForm.description}
+                        onChange={(e) => setItineraryForm((p) => ({ ...p, description: e.target.value }))}
+                      />
+                    </div>
+                    {itineraryError ? <p className="text-sm text-destructive">{itineraryError}</p> : null}
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={handleSaveItinerary}
+                      disabled={
+                        savingItinerary ||
+                        !itineraryForm.time.trim() ||
+                        !itineraryForm.title.trim() ||
+                        !itineraryForm.location.trim() ||
+                        !itineraryForm.description.trim()
+                      }
+                    >
+                      {savingItinerary ? 'Guardando…' : 'Guardar'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               {itinerary.length ? (
@@ -330,9 +458,19 @@ export default function AdminTripDetailPage() {
                         <p className="text-xs text-muted-foreground">{item.location}</p>
                       </div>
                     </div>
-                    <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                      {itineraryStatusLabels[item.status]}
-                    </span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {itineraryStatusLabels[item.status]}
+                      </span>
+                      <Button variant="ghost" size="icon" onClick={() => openEditItinerary(item)}>
+                        <PencilIcon className="size-4" />
+                        <span className="sr-only">Editar ítem</span>
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDeleteItinerary(item.id)}>
+                        <Trash2Icon className="size-4" />
+                        <span className="sr-only">Eliminar ítem</span>
+                      </Button>
+                    </div>
                   </div>
                 ))
               ) : (
@@ -351,9 +489,19 @@ export default function AdminTripDetailPage() {
                   <div key={announcement.id} className="border-b pb-3 last:border-0 last:pb-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">{announcement.title}</p>
-                      <span className="text-xs text-muted-foreground">
-                        {announcementTypeLabels[announcement.type]}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {announcementTypeLabels[announcement.type]}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteAnnouncement(announcement.id)}
+                        >
+                          <Trash2Icon className="size-4" />
+                          <span className="sr-only">Eliminar comunicado</span>
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-muted-foreground">{announcement.message}</p>
                   </div>
@@ -373,8 +521,14 @@ export default function AdminTripDetailPage() {
             {parents.length ? (
               parents.map((parent) => (
                 <div key={parent.id} className="flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
-                  <span className="text-sm font-medium">{parent.name}</span>
-                  <span className="text-xs text-muted-foreground">{parent.email}</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{parent.name}</span>
+                    <span className="text-xs text-muted-foreground">{parent.email}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveParent(parent.id)}>
+                    <UserMinusIcon className="size-4" />
+                    <span className="sr-only">Quitar apoderado</span>
+                  </Button>
                 </div>
               ))
             ) : (

@@ -1,45 +1,28 @@
 import { NextResponse } from 'next/server'
-import { clerkClient } from '@clerk/nextjs/server'
 import { Role } from '@prisma/client'
 import { prisma } from '@/lib/db'
-import { ApiError, handleApiError } from '@/lib/api/errors'
+import { ApiError } from '@/lib/api/errors'
 import { requireTripAccess } from '@/lib/api/require-role'
+import { describeUsers } from '@/lib/api/clerk-users'
+import { withApiHandler } from '@/lib/api/handler'
 
-async function describeUser(clerkUserId: string) {
-  try {
-    const client = await clerkClient()
-    const user = await client.users.getUser(clerkUserId)
-    return {
-      name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Sin nombre',
-      email: user.emailAddresses[0]?.emailAddress ?? '',
-    }
-  } catch {
-    return { name: 'Usuario no encontrado', email: '' }
+export const GET = withApiHandler<{ tripId: string }>(async (_request, { params }) => {
+  const { tripId } = await params
+  const { role } = await requireTripAccess(tripId)
+  if (role !== 'ADMIN' && role !== 'MONITOR') {
+    throw new ApiError('FORBIDDEN', 'Only monitors or admins can view the roster.')
   }
-}
 
-export async function GET(_request: Request, { params }: { params: Promise<{ tripId: string }> }) {
-  try {
-    const { tripId } = await params
-    const { role } = await requireTripAccess(tripId)
-    if (role !== 'ADMIN' && role !== 'MONITOR') {
-      throw new ApiError('FORBIDDEN', 'Only monitors or admins can view the roster.')
-    }
+  const memberships = await prisma.tripMembership.findMany({
+    where: { tripId, role: Role.PARENT },
+    orderBy: { createdAt: 'asc' },
+  })
 
-    const memberships = await prisma.tripMembership.findMany({
-      where: { tripId, role: Role.PARENT },
-      orderBy: { createdAt: 'asc' },
-    })
+  const users = await describeUsers(memberships.map((membership) => membership.clerkUserId))
+  const parents = memberships.map((membership) => ({
+    id: membership.id,
+    ...users.get(membership.clerkUserId)!,
+  }))
 
-    const parents = await Promise.all(
-      memberships.map(async (membership) => ({
-        id: membership.id,
-        ...(await describeUser(membership.clerkUserId)),
-      }))
-    )
-
-    return NextResponse.json({ parents })
-  } catch (error) {
-    return handleApiError(error)
-  }
-}
+  return NextResponse.json({ parents })
+})

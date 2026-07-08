@@ -35,7 +35,7 @@ enum AnnouncementType {
 
 model School {
   id    String @id @default(cuid())
-  name  String
+  name  String @unique
   trips Trip[]
 }
 
@@ -111,6 +111,14 @@ model Announcement {
   type       AnnouncementType @default(INFO)
   photoUrl   String?
   createdAt  DateTime         @default(now())
+}
+
+model RedeemAttempt {
+  id          String   @id @default(cuid())
+  clerkUserId String
+  createdAt   DateTime @default(now())
+
+  @@index([clerkUserId, createdAt])
 }
 
 model LocationPing {

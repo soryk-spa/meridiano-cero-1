@@ -1,17 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { handleApiError } from '@/lib/api/errors'
 import { requireAdmin } from '@/lib/api/require-role'
+import { withApiHandler } from '@/lib/api/handler'
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    await requireAdmin()
-    const { id } = await params
+export const DELETE = withApiHandler<{ id: string }>(async (_request, { params }) => {
+  await requireAdmin()
+  const { id } = await params
 
-    await prisma.accessCode.delete({ where: { id } })
+  await prisma.accessCode.delete({ where: { id } })
 
-    return NextResponse.json({ ok: true })
-  } catch (error) {
-    return handleApiError(error)
-  }
-}
+  return NextResponse.json({ ok: true })
+})

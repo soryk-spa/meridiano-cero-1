@@ -11,6 +11,7 @@ import {
 import { Activity, Bell, CalendarDays, MapPin, Radio, School, ShieldCheck, Ticket } from 'lucide-react'
 import type { TripStatus } from '@prisma/client'
 import { prisma } from '@/lib/db'
+import { KNOWN_DESTINATIONS } from '@/lib/destinations'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -33,18 +34,24 @@ const MOCK_STATS = [
 ]
 
 const MOCK_TRIPS: { name: string; school: string; status: TripStatus; day: string }[] = [
-  { name: 'Gira Patagonia 2026', school: 'Colegio San Gabriel', status: 'IN_TRANSIT', day: '2/5' },
-  { name: 'Gira Atacama 2026', school: 'Colegio Andino', status: 'IN_ACTIVITY', day: '1/4' },
-  { name: 'Gira Valparaíso 2026', school: 'Colegio del Mar', status: 'FINISHED', day: '5/5' },
+  { name: 'Gira Bariloche 2026', school: 'Colegio San Gabriel', status: 'IN_TRANSIT', day: '2/5' },
+  { name: 'Gira Camboriú 2026', school: 'Colegio Andino', status: 'IN_ACTIVITY', day: '1/4' },
+  { name: 'Gira Sur de Chile 2026', school: 'Colegio del Mar', status: 'FINISHED', day: '5/5' },
 ]
 
-const COVERAGE_ROUTES = [
-  { start: { lat: -33.4489, lng: -70.6693, label: 'Santiago' }, end: { lat: 19.4326, lng: -99.1332, label: 'Ciudad de México' } },
-  { start: { lat: -33.4489, lng: -70.6693, label: 'Santiago' }, end: { lat: 4.711, lng: -74.0721, label: 'Bogotá' } },
-  { start: { lat: -33.4489, lng: -70.6693, label: 'Santiago' }, end: { lat: -12.0464, lng: -77.0428, label: 'Lima' } },
-  { start: { lat: -33.4489, lng: -70.6693, label: 'Santiago' }, end: { lat: -34.6037, lng: -58.3816, label: 'Buenos Aires' } },
-  { start: { lat: -33.4489, lng: -70.6693, label: 'Santiago' }, end: { lat: -23.5505, lng: -46.6333, label: 'São Paulo' } },
-]
+const SANTIAGO = { lat: -33.4489, lng: -70.6693, label: 'Santiago' }
+
+const ROUTE_LABELS: Record<(typeof KNOWN_DESTINATIONS)[number]['id'], string> = {
+  bariloche: 'Bariloche',
+  camboriu: 'Camboriú',
+  'sur-de-chile': 'Pucón (Sur de Chile)',
+  'isla-de-pascua': 'Isla de Pascua',
+}
+
+const COVERAGE_ROUTES = KNOWN_DESTINATIONS.map((destination) => ({
+  start: SANTIAGO,
+  end: { lat: destination.lat, lng: destination.lng, label: ROUTE_LABELS[destination.id] },
+}))
 
 function LandingPage() {
   const features = [
@@ -110,7 +117,7 @@ function LandingPage() {
 
         <div>
           <Badge variant="outline" className="mb-4">
-            Cobertura en Latinoamérica
+            Destinos de nuestras giras
           </Badge>
           <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
             <HeroGlobe routes={COVERAGE_ROUTES} />
