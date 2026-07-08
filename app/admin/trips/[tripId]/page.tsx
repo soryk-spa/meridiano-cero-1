@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { CheckIcon, CopyIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, MailPlusIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import type { AccessCode, Announcement, ItineraryItem, LocationPing, Role, Trip, TripStatus } from '@prisma/client'
@@ -39,6 +39,7 @@ const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 type TripDetail = Trip & { school: { name: string } }
 type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type ParentRow = { id: string; name: string; email: string }
+type MonitorRow = { id: string; name: string; email: string }
 
 const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'EMERGENCY', 'FINISHED']
 const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
@@ -54,9 +55,14 @@ export default function AdminTripDetailPage() {
   const [ping, setPing] = useState<LocationPing | null>(null)
   const [codes, setCodes] = useState<CodeRow[]>([])
   const [parents, setParents] = useState<ParentRow[]>([])
+  const [monitors, setMonitors] = useState<MonitorRow[]>([])
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [addingRole, setAddingRole] = useState<Role | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM)
   const [editDateRange, setEditDateRange] = useState<DateRange | undefined>()
@@ -82,7 +88,11 @@ export default function AdminTripDetailPage() {
     if (announcementsRes.ok) setAnnouncements((await announcementsRes.json()).announcements)
     if (locationRes.ok) setPing((await locationRes.json()).ping)
     if (codesRes.ok) setCodes((await codesRes.json()).codes)
-    if (rosterRes.ok) setParents((await rosterRes.json()).parents)
+    if (rosterRes.ok) {
+      const roster = await rosterRes.json()
+      setParents(roster.parents)
+      setMonitors(roster.monitors)
+    }
   }, [tripId])
 
   useEffect(() => {
@@ -222,6 +232,30 @@ export default function AdminTripDetailPage() {
     if (!window.confirm('¿Quitar a este apoderado de la gira?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
     if (res.ok) void load()
+  }
+
+  async function handleRemoveMonitor(membershipId: string) {
+    if (!window.confirm('¿Quitar a este monitor de la gira?')) return
+    const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
+    if (res.ok) void load()
+  }
+
+  async function handleInviteMonitor() {
+    setInviting(true)
+    setInviteError(null)
+    const res = await fetch(`/api/v1/trips/${tripId}/invite-monitor`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailAddress: inviteEmail }),
+    })
+    setInviting(false)
+    if (res.ok) {
+      setInviteEmail('')
+      setInviteOpen(false)
+    } else {
+      const data = await res.json().catch(() => null)
+      setInviteError(data?.error?.message ?? 'No se pudo enviar la invitación.')
+    }
   }
 
   if (!trip) {
@@ -533,6 +567,70 @@ export default function AdminTripDetailPage() {
               ))
             ) : (
               <p className="text-sm text-muted-foreground">Sin apoderados registrados todavía.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Monitores ({monitors.length})</CardTitle>
+            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setInviteEmail('')
+                    setInviteError(null)
+                  }}
+                >
+                  <MailPlusIcon />
+                  Invitar monitor
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invitar monitor a esta gira</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="invite-monitor-email">Correo electrónico</Label>
+                  <Input
+                    id="invite-monitor-email"
+                    type="email"
+                    placeholder="nombre@correo.cl"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se enviará una invitación por correo. Al aceptarla, quedará asociado a esta gira
+                    automáticamente, sin necesidad de código.
+                  </p>
+                  {inviteError ? <p className="text-sm text-destructive">{inviteError}</p> : null}
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleInviteMonitor} disabled={inviting || !inviteEmail}>
+                    {inviting ? 'Enviando…' : 'Enviar invitación'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {monitors.length ? (
+              monitors.map((monitor) => (
+                <div key={monitor.id} className="flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{monitor.name}</span>
+                    <span className="text-xs text-muted-foreground">{monitor.email}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveMonitor(monitor.id)}>
+                    <UserMinusIcon className="size-4" />
+                    <span className="sr-only">Quitar monitor</span>
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">Sin monitores asignados todavía.</p>
             )}
           </CardContent>
         </Card>

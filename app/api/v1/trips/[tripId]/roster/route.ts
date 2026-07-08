@@ -14,15 +14,17 @@ export const GET = withApiHandler<{ tripId: string }>(async (_request, { params 
   }
 
   const memberships = await prisma.tripMembership.findMany({
-    where: { tripId, role: Role.PARENT },
+    where: { tripId, role: { in: [Role.PARENT, Role.MONITOR] } },
     orderBy: { createdAt: 'asc' },
   })
 
   const users = await describeUsers(memberships.map((membership) => membership.clerkUserId))
-  const parents = memberships.map((membership) => ({
+  const toRow = (membership: (typeof memberships)[number]) => ({
     id: membership.id,
     ...users.get(membership.clerkUserId)!,
-  }))
+  })
+  const parents = memberships.filter((m) => m.role === Role.PARENT).map(toRow)
+  const monitors = memberships.filter((m) => m.role === Role.MONITOR).map(toRow)
 
-  return NextResponse.json({ parents })
+  return NextResponse.json({ parents, monitors })
 })

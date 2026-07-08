@@ -31,15 +31,6 @@ export const POST = withApiHandler(async (request) => {
 
   const code = parsed.data.code.toUpperCase()
 
-  if (process.env.ADMIN_INVITE_CODE && code === process.env.ADMIN_INVITE_CODE.toUpperCase()) {
-    await prisma.adminUser.upsert({
-      where: { clerkUserId },
-      update: {},
-      create: { clerkUserId },
-    })
-    return NextResponse.json({ role: 'ADMIN', tripId: null })
-  }
-
   const accessCode = await prisma.accessCode.findUnique({ where: { code } })
   if (!accessCode) {
     throw new ApiError('NOT_FOUND', 'Invalid access code.')
