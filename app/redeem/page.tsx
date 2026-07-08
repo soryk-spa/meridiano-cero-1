@@ -18,22 +18,33 @@ export default function RedeemPage() {
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [checkingInvite, setCheckingInvite] = useState(true)
+  const [checkingAccess, setCheckingAccess] = useState(true)
 
   useEffect(() => {
     let cancelled = false
 
     void (async () => {
-      const res = await fetch('/api/v1/auth/claim-invite', { method: 'POST' })
+      const claimRes = await fetch('/api/v1/auth/claim-invite', { method: 'POST' })
       if (cancelled) return
-      if (res.ok) {
-        const data = await res.json()
-        if (data.granted) {
+      if (claimRes.ok) {
+        const claimData = await claimRes.json()
+        if (claimData.granted) {
           router.push('/admin')
           return
         }
       }
-      setCheckingInvite(false)
+
+      const meRes = await fetch('/api/v1/me/trips')
+      if (cancelled) return
+      if (meRes.ok) {
+        const me = await meRes.json()
+        if (me.isAdmin || me.memberships.length > 0) {
+          router.push('/')
+          return
+        }
+      }
+
+      setCheckingAccess(false)
     })()
 
     return () => {
@@ -64,7 +75,7 @@ export default function RedeemPage() {
     else router.push(`/parent/${data.tripId}`)
   }
 
-  if (checkingInvite) {
+  if (checkingAccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
         <span className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
