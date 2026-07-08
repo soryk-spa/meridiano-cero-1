@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { FetchError } from '@/components/fetch-error'
 
 type Person = { clerkUserId: string; name: string; email: string; imageUrl: string }
 type Admin = Person & { createdAt: string; isCurrentUser: boolean }
@@ -42,13 +43,18 @@ export default function AdminTeamPage() {
   const [email, setEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    setLoadError(null)
     const res = await fetch('/api/v1/admin/team')
     if (res.ok) {
       const data = await res.json()
       setAdmins(data.admins)
       setMonitors(data.monitors)
+    } else {
+      const data = await res.json().catch(() => null)
+      setLoadError(data?.error?.message ?? 'No se pudo cargar el equipo.')
     }
   }, [])
 
@@ -131,6 +137,9 @@ export default function AdminTeamPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+        {loadError && !admins ? (
+          <FetchError message={loadError} onRetry={load} />
+        ) : (
         <Tabs defaultValue="admins">
           <TabsList>
             <TabsTrigger value="admins">Administradores</TabsTrigger>
@@ -217,6 +226,7 @@ export default function AdminTeamPage() {
             </Card>
           </TabsContent>
         </Tabs>
+        )}
       </div>
     </>
   )

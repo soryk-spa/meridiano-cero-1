@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DownloadIcon } from 'lucide-react'
 import type { Announcement, AnnouncementType } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { FetchError } from '@/components/fetch-error'
 import { announcementTypeLabels } from '@/lib/labels'
 import type { TripRow } from '@/components/data-table'
 
@@ -53,17 +54,30 @@ export default function AdminReportsPage() {
   const [reports, setReports] = useState<ReportRow[] | null>(null)
   const [trips, setTrips] = useState<TripRow[]>([])
   const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'ALL'>('ALL')
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setError(null)
+    const [reportsRes, tripsRes] = await Promise.all([
+      fetch('/api/v1/admin/reports'),
+      fetch('/api/v1/trips'),
+    ])
+    if (reportsRes.ok) {
+      setReports((await reportsRes.json()).announcements)
+    } else {
+      const data = await reportsRes.json().catch(() => null)
+      setError(data?.error?.message ?? 'No se pudieron cargar los reportes.')
+    }
+    if (tripsRes.ok) setTrips((await tripsRes.json()).trips)
+  }, [])
 
   useEffect(() => {
-    void (async () => {
-      const [reportsRes, tripsRes] = await Promise.all([
-        fetch('/api/v1/admin/reports'),
-        fetch('/api/v1/trips'),
-      ])
-      if (reportsRes.ok) setReports((await reportsRes.json()).announcements)
-      if (tripsRes.ok) setTrips((await tripsRes.json()).trips)
-    })()
-  }, [])
+    const id = window.setTimeout(() => {
+      void load()
+    }, 0)
+
+    return () => window.clearTimeout(id)
+  }, [load])
 
   const filtered = useMemo(
     () => (reports ?? []).filter((report) => typeFilter === 'ALL' || report.type === typeFilter),
@@ -97,7 +111,9 @@ export default function AdminReportsPage() {
         </div>
 
         <Card className="overflow-hidden">
-          {!reports ? (
+          {error && !reports ? (
+            <FetchError message={error} onRetry={load} />
+          ) : !reports ? (
             <CardContent>
               <Skeleton className="h-64 w-full" />
             </CardContent>

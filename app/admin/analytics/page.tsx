@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -15,6 +15,7 @@ import {
 import { SiteHeader } from '@/components/site-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FetchError } from '@/components/fetch-error'
 import { tripStatusLabels, announcementTypeLabels } from '@/lib/labels'
 import type { TripStatus, AnnouncementType } from '@prisma/client'
 
@@ -30,13 +31,35 @@ type Analytics = {
 
 export default function AdminAnalyticsPage() {
   const [data, setData] = useState<Analytics | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setError(null)
+    const res = await fetch('/api/v1/admin/analytics')
+    if (res.ok) {
+      setData(await res.json())
+    } else {
+      const body = await res.json().catch(() => null)
+      setError(body?.error?.message ?? 'No se pudo cargar la analítica.')
+    }
+  }, [])
 
   useEffect(() => {
-    void (async () => {
-      const res = await fetch('/api/v1/admin/analytics')
-      if (res.ok) setData(await res.json())
-    })()
-  }, [])
+    const id = window.setTimeout(() => {
+      void load()
+    }, 0)
+
+    return () => window.clearTimeout(id)
+  }, [load])
+
+  if (error && !data) {
+    return (
+      <>
+        <SiteHeader title="Analítica" subtitle="Métricas de la plataforma" />
+        <FetchError message={error} onRetry={load} />
+      </>
+    )
+  }
 
   if (!data) {
     return (

@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import type { TripStatus } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import StatusBadge from '@/components/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FetchError } from '@/components/fetch-error'
 import type { FleetMarker } from '@/components/FleetMapView'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
@@ -33,13 +34,35 @@ const STATUS_COLOR: Record<TripStatus, string> = {
 export default function AdminMapPage() {
   const [fleet, setFleet] = useState<FleetTrip[] | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setError(null)
+    const res = await fetch('/api/v1/admin/map')
+    if (res.ok) {
+      setFleet((await res.json()).fleet)
+    } else {
+      const data = await res.json().catch(() => null)
+      setError(data?.error?.message ?? 'No se pudo cargar el mapa.')
+    }
+  }, [])
 
   useEffect(() => {
-    void (async () => {
-      const res = await fetch('/api/v1/admin/map')
-      if (res.ok) setFleet((await res.json()).fleet)
-    })()
-  }, [])
+    const id = window.setTimeout(() => {
+      void load()
+    }, 0)
+
+    return () => window.clearTimeout(id)
+  }, [load])
+
+  if (error && !fleet) {
+    return (
+      <>
+        <SiteHeader title="Mapa operativo" subtitle="Giras en terreno en tiempo real" />
+        <FetchError message={error} onRetry={load} />
+      </>
+    )
+  }
 
   if (!fleet) {
     return (

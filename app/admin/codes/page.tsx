@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { FetchError } from '@/components/fetch-error'
 
 type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type TripOption = { id: string; name: string }
@@ -40,13 +41,20 @@ export default function AdminCodesPage() {
   const [role, setRole] = useState<Role>('PARENT')
   const [creating, setCreating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    setError(null)
     const [codesRes, tripsRes] = await Promise.all([
       fetch('/api/v1/admin/codes'),
       fetch('/api/v1/trips'),
     ])
-    if (codesRes.ok) setCodes((await codesRes.json()).codes)
+    if (codesRes.ok) {
+      setCodes((await codesRes.json()).codes)
+    } else {
+      const data = await codesRes.json().catch(() => null)
+      setError(data?.error?.message ?? 'No se pudieron cargar los códigos.')
+    }
     if (tripsRes.ok) setTrips((await tripsRes.json()).trips)
   }, [])
 
@@ -142,7 +150,9 @@ export default function AdminCodesPage() {
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
         <Card className="overflow-hidden">
-          {!codes ? (
+          {error && !codes ? (
+            <FetchError message={error} onRetry={load} />
+          ) : !codes ? (
             <CardContent>
               <Skeleton className="h-64 w-full" />
             </CardContent>

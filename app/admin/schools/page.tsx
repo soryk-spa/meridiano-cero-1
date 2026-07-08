@@ -16,6 +16,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FetchError } from '@/components/fetch-error'
 
 type SchoolRow = {
   id: string
@@ -31,10 +32,17 @@ export default function AdminSchoolsPage() {
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    setLoadError(null)
     const res = await fetch('/api/v1/admin/schools')
-    if (res.ok) setSchools((await res.json()).schools)
+    if (res.ok) {
+      setSchools((await res.json()).schools)
+    } else {
+      const data = await res.json().catch(() => null)
+      setLoadError(data?.error?.message ?? 'No se pudieron cargar los colegios.')
+    }
   }, [])
 
   useEffect(() => {
@@ -97,7 +105,11 @@ export default function AdminSchoolsPage() {
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
         <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-          {!schools ? (
+          {loadError && !schools ? (
+            <div className="col-span-full">
+              <FetchError message={loadError} onRetry={load} />
+            </div>
+          ) : !schools ? (
             Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 w-full" />)
           ) : schools.length ? (
             schools.map((school) => (
