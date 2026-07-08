@@ -8,7 +8,6 @@ import {
   IconDashboard,
   IconDatabase,
   IconHelp,
-  IconInnerShadowTop,
   IconMap,
   IconReport,
   IconRoute,
@@ -22,6 +21,7 @@ import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
+import { Logo } from "@/components/logo"
 import { useCommandMenu } from "@/lib/command-menu-context"
 import {
   Sidebar,
@@ -80,11 +80,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
+              className="data-[slot=sidebar-menu-button]:h-auto data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <Link href="/admin">
-                <IconInnerShadowTop className="size-5!" />
-                <span className="text-base font-semibold">Meridiano Cero</span>
+                <Logo variant="gris" className="h-6 w-auto" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

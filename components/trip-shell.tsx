@@ -8,13 +8,13 @@ import {
   CalendarDays,
   Home,
   MapIcon,
-  MapPinIcon,
   Radio,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
 import { SiteHeader } from "@/components/site-header"
+import { Logo } from "@/components/logo"
 import StatusBadge from "@/components/StatusBadge"
 import {
   Sidebar,
@@ -73,10 +73,9 @@ export function TripShell({
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
+              <SidebarMenuButton asChild className="h-auto data-[slot=sidebar-menu-button]:!p-1.5">
                 <Link href="/">
-                  <MapPinIcon className="h-5 w-5" />
-                  <span className="text-base font-semibold">Meridiano Cero</span>
+                  <Logo variant="gris" className="h-6 w-auto" />
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

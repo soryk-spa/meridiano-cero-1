@@ -7,8 +7,8 @@
   --color-card-foreground: oklch(0.141 0.005 285.823);
   --color-popover: oklch(1 0 0);
   --color-popover-foreground: oklch(0.141 0.005 285.823);
-  --color-primary: oklch(0.21 0.006 285.885);
-  --color-primary-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.72 0.191 49.8);
+  --color-primary-foreground: oklch(0.145 0 0);
   --color-secondary: oklch(0.967 0.001 286.375);
   --color-secondary-foreground: oklch(0.21 0.006 285.885);
   --color-muted: oklch(0.967 0.001 286.375);
@@ -20,13 +20,15 @@
   --color-border: oklch(0.92 0.004 286.32);
   --color-input: oklch(0.92 0.004 286.32);
   --color-ring: oklch(0.705 0.015 286.067);
+  --color-brand-violet: oklch(0.471 0.302 272.8);
+  --color-brand-slate: oklch(0.357 0.024 243.6);
   --radius: 0.5rem;
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
   --sidebar-primary: hsl(240 5.9% 10%);
   --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-accent: oklch(0.96 0.03 49.8);
+  --sidebar-accent-foreground: oklch(0.52 0.17 45);
   --sidebar-border: hsl(220 13% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
@@ -39,8 +41,8 @@
   --color-card-foreground: oklch(0.985 0 0);
   --color-popover: oklch(0.185 0 0);
   --color-popover-foreground: oklch(0.985 0 0);
-  --color-primary: oklch(0.922 0 0);
-  --color-primary-foreground: oklch(0.185 0 0);
+  --color-primary: oklch(0.72 0.191 49.8);
+  --color-primary-foreground: oklch(0.145 0 0);
   --color-secondary: oklch(0.255 0 0);
   --color-secondary-foreground: oklch(0.985 0 0);
   --color-muted: oklch(0.255 0 0);
@@ -56,8 +58,8 @@
   --sidebar-foreground: hsl(240 4.8% 95.9%);
   --sidebar-primary: hsl(224.3 76.3% 48%);
   --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-accent: oklch(0.28 0.05 49.8);
+  --sidebar-accent-foreground: oklch(0.78 0.15 49.8);
   --sidebar-border: hsl(240 3.7% 15.9%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
@@ -228,6 +230,8 @@ body {
 }
 
 @theme inline {
+  --font-sans: var(--font-montserrat);
+  --font-display: var(--font-monument);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

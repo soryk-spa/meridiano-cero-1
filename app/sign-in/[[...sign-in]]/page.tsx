@@ -2,9 +2,20 @@ import { SignIn } from '@clerk/nextjs'
 
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/branding/ELEMENTOS DECORATIVOS/MANCHA-MORADA.png"
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -left-40 -z-10 w-[600px] max-w-none opacity-10 blur-3xl select-none"
+      />
       <SignIn
         appearance={{
+          options: {
+            logoImageUrl: '/branding/LOGOS/logo-meridiano-naranja.svg',
+            logoPlacement: 'inside',
+          },
           variables: {
             colorBackground: "var(--color-card)",
             colorPrimary: "var(--color-primary)",

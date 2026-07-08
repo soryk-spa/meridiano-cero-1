@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Ticket, ArrowRight, AlertCircle } from 'lucide-react'
+import { ArrowRight, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Logo } from '@/components/logo'
 
 const DEMO_CODES = [
   { code: 'BAR-2026', role: 'Apoderado' },
@@ -84,13 +85,18 @@ export default function RedeemPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
+    <div className="relative overflow-hidden min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/branding/ELEMENTOS DECORATIVOS/forma-1-azul.png"
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute -bottom-16 -right-16 -z-10 w-[420px] max-w-none opacity-15 select-none"
+      />
       <div className="w-full max-w-sm space-y-4">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/10 mb-4">
-            <Ticket size={28} className="text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Vincula tu gira</h1>
+          <Logo variant="blanco" className="h-10 w-auto mx-auto mb-4" />
+          <h1 className="font-display text-2xl text-white">Vincula tu gira</h1>
           <p className="text-slate-400 text-sm mt-1">
             Ingresa el código de acceso que te entregó el coordinador.
           </p>
