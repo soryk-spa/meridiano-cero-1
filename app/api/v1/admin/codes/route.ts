@@ -5,12 +5,7 @@ import { prisma } from '@/lib/db'
 import { ApiError } from '@/lib/api/errors'
 import { requireAdmin } from '@/lib/api/require-role'
 import { withApiHandler } from '@/lib/api/handler'
-
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-
-function generateCode(length = 6) {
-  return Array.from({ length }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('')
-}
+import { generateAccessCode } from '@/lib/generate-code'
 
 export const GET = withApiHandler(async (request) => {
   await requireAdmin()
@@ -41,11 +36,11 @@ export const POST = withApiHandler(async (request) => {
   const trip = await prisma.trip.findUnique({ where: { id: parsed.data.tripId } })
   if (!trip) throw new ApiError('NOT_FOUND', 'Trip not found.')
 
-  let code = generateCode()
+  let code = generateAccessCode()
   for (let attempt = 0; attempt < 5; attempt++) {
     const existing = await prisma.accessCode.findUnique({ where: { code } })
     if (!existing) break
-    code = generateCode()
+    code = generateAccessCode()
   }
 
   const accessCode = await prisma.accessCode.create({

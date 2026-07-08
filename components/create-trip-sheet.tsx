@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, RefreshCwIcon } from "lucide-react"
 import { differenceInCalendarDays } from "date-fns"
 import type { DateRange } from "react-day-picker"
 
@@ -27,6 +27,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { KNOWN_DESTINATIONS } from "@/lib/destinations"
+import { generateAccessCode } from "@/lib/generate-code"
 
 const CUSTOM_DESTINATION = "custom"
 
@@ -219,21 +220,45 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="parentCode">Código apoderado</Label>
-              <Input
-                id="parentCode"
-                placeholder="Código apoderado"
-                value={form.parentCode}
-                onChange={(e) => setForm((p) => ({ ...p, parentCode: e.target.value }))}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="parentCode"
+                  placeholder="Código apoderado"
+                  className="flex-1"
+                  value={form.parentCode}
+                  onChange={(e) => setForm((p) => ({ ...p, parentCode: e.target.value.toUpperCase() }))}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setForm((p) => ({ ...p, parentCode: generateAccessCode() }))}
+                >
+                  <RefreshCwIcon className="size-4" />
+                  <span className="sr-only">Generar código</span>
+                </Button>
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="monitorCode">Código monitor</Label>
-              <Input
-                id="monitorCode"
-                placeholder="Código monitor"
-                value={form.monitorCode}
-                onChange={(e) => setForm((p) => ({ ...p, monitorCode: e.target.value }))}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="monitorCode"
+                  placeholder="Código monitor"
+                  className="flex-1"
+                  value={form.monitorCode}
+                  onChange={(e) => setForm((p) => ({ ...p, monitorCode: e.target.value.toUpperCase() }))}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setForm((p) => ({ ...p, monitorCode: generateAccessCode() }))}
+                >
+                  <RefreshCwIcon className="size-4" />
+                  <span className="sr-only">Generar código</span>
+                </Button>
+              </div>
             </div>
           </form>
         </div>

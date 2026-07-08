@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 
 export type ApiErrorCode =
   | 'UNAUTHENTICATED'
@@ -32,6 +33,9 @@ export function apiErrorResponse(error: ApiError) {
 
 export function handleApiError(error: unknown) {
   if (error instanceof ApiError) return apiErrorResponse(error)
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    return apiErrorResponse(new ApiError('VALIDATION_ERROR', 'That value is already in use.'))
+  }
   console.error(error)
   return NextResponse.json(
     { error: { code: 'INTERNAL_ERROR', message: 'Unexpected server error.' } },
