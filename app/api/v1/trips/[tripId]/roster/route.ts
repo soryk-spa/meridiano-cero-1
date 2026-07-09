@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { Role } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { ApiError } from '@/lib/api/errors'
-import { requireTripAccess } from '@/lib/api/require-role'
+import { requireAdmin, requireTripAccess } from '@/lib/api/require-role'
 import { describeUsers } from '@/lib/api/clerk-users'
 import { withApiHandler } from '@/lib/api/handler'
 
@@ -27,4 +28,32 @@ export const GET = withApiHandler<{ tripId: string }>(async (_request, { params 
   const monitors = memberships.filter((m) => m.role === Role.MONITOR).map(toRow)
 
   return NextResponse.json({ parents, monitors })
+})
+
+const bodySchema = z.object({
+  clerkUserId: z.string().trim().min(1),
+  role: z.enum(Role),
+})
+
+/** Admin assigns an already-registered user to this trip with the given role — no code involved. */
+export const POST = withApiHandler<{ tripId: string }>(async (request, { params }) => {
+  await requireAdmin()
+  const { tripId } = await params
+
+  const trip = await prisma.trip.findUnique({ where: { id: tripId } })
+  if (!trip) throw new ApiError('NOT_FOUND', 'Trip not found.')
+
+  const json = await request.json().catch(() => null)
+  const parsed = bodySchema.safeParse(json)
+  if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'A user and role are required.')
+
+  const membership = await prisma.tripMembership.upsert({
+    where: {
+      clerkUserId_tripId_role: { clerkUserId: parsed.data.clerkUserId, tripId, role: parsed.data.role },
+    },
+    update: {},
+    create: { clerkUserId: parsed.data.clerkUserId, tripId, role: parsed.data.role },
+  })
+
+  return NextResponse.json({ membership }, { status: 201 })
 })

@@ -16,6 +16,7 @@ import {
   IconSearch,
   IconSettings,
   IconTicket,
+  IconUserCog,
   IconUsers,
 } from "@tabler/icons-react"
 
@@ -40,6 +41,7 @@ const navMainItems = [
   { title: "Analítica", url: "/admin/analytics", icon: IconChartBar },
   { title: "Mapa operativo", url: "/admin/map", icon: IconMap },
   { title: "Equipo", url: "/admin/team", icon: IconUsers },
+  { title: "Usuarios", url: "/admin/users", icon: IconUserCog },
 ]
 
 const documentItems = [
