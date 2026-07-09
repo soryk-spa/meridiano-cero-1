@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { del } from '@vercel/blob'
 import { differenceInCalendarDays } from 'date-fns'
 import { TripStatus } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { ApiError } from '@/lib/api/errors'
-import { requireTripAccess } from '@/lib/api/require-role'
+import { requireAdmin, requireTripAccess } from '@/lib/api/require-role'
 import { withApiHandler } from '@/lib/api/handler'
 
 export const GET = withApiHandler<{ tripId: string }>(async (_request, { params }) => {
@@ -82,4 +83,24 @@ export const PATCH = withApiHandler<{ tripId: string }>(async (request, { params
   })
 
   return NextResponse.json({ trip })
+})
+
+export const DELETE = withApiHandler<{ tripId: string }>(async (_request, { params }) => {
+  await requireAdmin()
+  const { tripId } = await params
+
+  const trip = await prisma.trip.findUnique({ where: { id: tripId } })
+  if (!trip) throw new ApiError('NOT_FOUND', 'Trip not found.')
+
+  const [itineraryPhotos, announcementPhotos] = await Promise.all([
+    prisma.itineraryItem.findMany({ where: { tripId, photoUrl: { not: null } }, select: { photoUrl: true } }),
+    prisma.announcement.findMany({ where: { tripId, photoUrl: { not: null } }, select: { photoUrl: true } }),
+  ])
+  await Promise.all(
+    [...itineraryPhotos, ...announcementPhotos].map((row) => del(row.photoUrl!).catch(() => {}))
+  )
+
+  await prisma.trip.delete({ where: { id: tripId } })
+
+  return NextResponse.json({ ok: true })
 })

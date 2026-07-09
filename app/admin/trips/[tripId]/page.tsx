@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { CheckIcon, CopyIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
@@ -50,6 +50,8 @@ const EMPTY_MONITOR_FORM = { firstName: '', lastName: '', emailAddress: '' }
 
 export default function AdminTripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>()
+  const searchParams = useSearchParams()
+  const autoEditTriggered = useRef(false)
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -131,6 +133,14 @@ export default function AdminTripDetailPage() {
     setEditError(null)
     setEditOpen(true)
   }
+
+  useEffect(() => {
+    if (!autoEditTriggered.current && trip && searchParams.get('edit') === '1') {
+      autoEditTriggered.current = true
+      openEditDialog()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip, searchParams])
 
   async function handleSaveEdit() {
     if (!editDateRange?.from || !editDateRange?.to) return

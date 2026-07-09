@@ -22,6 +22,8 @@ import {
   ColumnsIcon,
   ListPlusIcon,
   MoreVerticalIcon,
+  PencilIcon,
+  Trash2Icon,
 } from "lucide-react"
 import type { AccessCode, Trip } from "@prisma/client"
 
@@ -57,7 +59,56 @@ function codeFor(trip: TripRow, role: "PARENT" | "MONITOR") {
   return trip.accessCodes.find((c) => c.role === role)?.code ?? "—"
 }
 
-const columns: ColumnDef<TripRow>[] = [
+function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripName: string; onDeleted: () => void }) {
+  const [deleting, setDeleting] = React.useState(false)
+
+  async function handleDelete() {
+    if (!window.confirm(`¿Eliminar "${tripName}"? Se borrará todo su itinerario, comunicados, códigos y equipo asociado. Esta acción no se puede deshacer.`)) {
+      return
+    }
+    setDeleting(true)
+    const res = await fetch(`/api/v1/trips/${tripId}`, { method: "DELETE" })
+    setDeleting(false)
+    if (res.ok) onDeleted()
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          className="flex size-8 text-muted-foreground data-[state=open]:bg-muted"
+          size="icon"
+          disabled={deleting}
+        >
+          <MoreVerticalIcon />
+          <span className="sr-only">Abrir menú</span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/trips/${tripId}`}>Ver gira</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href={`/admin/trips/${tripId}?edit=1`}>
+            <PencilIcon className="size-4" />
+            Editar gira
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+          onSelect={handleDelete}
+        >
+          <Trash2Icon className="size-4" />
+          Eliminar gira
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
+  return [
   {
     accessorKey: "name",
     header: ({ column }) => (
@@ -66,7 +117,7 @@ const columns: ColumnDef<TripRow>[] = [
       </Button>
     ),
     cell: ({ row }) => (
-      <Link href={`/parent/${row.original.id}`} className="font-medium hover:underline">
+      <Link href={`/admin/trips/${row.original.id}`} className="font-medium hover:underline">
         {row.original.name}
       </Link>
     ),
@@ -106,30 +157,25 @@ const columns: ColumnDef<TripRow>[] = [
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex size-8 text-muted-foreground data-[state=open]:bg-muted" size="icon">
-            <MoreVerticalIcon />
-            <span className="sr-only">Abrir menú</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem asChild>
-            <Link href={`/parent/${row.original.id}`}>Ver como apoderado</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link href={`/monitor/${row.original.id}`}>Ver como monitor</Link>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <TripRowActions tripId={row.original.id} tripName={row.original.name} onDeleted={onTripDeleted} />
     ),
   },
-]
+  ]
+}
 
-export function DataTable({ data, toolbarAction }: { data: TripRow[]; toolbarAction?: React.ReactNode }) {
+export function DataTable({
+  data,
+  toolbarAction,
+  onTripDeleted,
+}: {
+  data: TripRow[]
+  toolbarAction?: React.ReactNode
+  onTripDeleted?: () => void
+}) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 })
+  const columns = React.useMemo(() => buildColumns(onTripDeleted ?? (() => {})), [onTripDeleted])
 
   const table = useReactTable({
     data,
