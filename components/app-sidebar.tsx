@@ -10,6 +10,7 @@ import {
   IconHelp,
   IconInnerShadowTop,
   IconMap,
+  IconMapPinPlus,
   IconReport,
   IconRoute,
   IconSearch,
@@ -91,7 +92,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={navMain} />
+        <NavMain
+          items={navMain}
+          quickAction={{ title: "Nueva gira", url: "/admin/trips/new", icon: IconMapPinPlus }}
+        />
         <NavDocuments items={documentItems} />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>

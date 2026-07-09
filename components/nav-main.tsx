@@ -2,9 +2,7 @@
 
 import Link from "next/link"
 import type { ComponentType } from "react"
-import { IconMail, IconMapPinPlus } from "@tabler/icons-react"
 
-import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -17,6 +15,7 @@ type NavIcon = ComponentType<{ className?: string }>
 
 export function NavMain({
   items,
+  quickAction,
 }: {
   items: {
     title: string
@@ -24,32 +23,31 @@ export function NavMain({
     isActive?: boolean
     icon?: NavIcon
   }[]
+  quickAction?: {
+    title: string
+    url: string
+    icon: NavIcon
+  }
 }) {
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
-        <SidebarMenu>
-          <SidebarMenuItem className="flex items-center gap-2">
-            <SidebarMenuButton
-              asChild
-              tooltip="Nueva gira"
-              className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-            >
-              <Link href="/admin/trips/new">
-                <IconMapPinPlus />
-                <span>Nueva gira</span>
-              </Link>
-            </SidebarMenuButton>
-            <Button
-              size="icon"
-              className="size-8 group-data-[collapsible=icon]:opacity-0"
-              variant="outline"
-            >
-              <IconMail />
-              <span className="sr-only">Invitar</span>
-            </Button>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        {quickAction ? (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                tooltip={quickAction.title}
+                className="min-w-8 bg-brand-orange text-white duration-200 ease-linear hover:bg-brand-orange/90 hover:text-white active:bg-brand-orange/90 active:text-white"
+              >
+                <Link href={quickAction.url}>
+                  <quickAction.icon />
+                  <span>{quickAction.title}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        ) : null}
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>

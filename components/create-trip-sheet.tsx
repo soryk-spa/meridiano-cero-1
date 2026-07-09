@@ -106,7 +106,7 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button size="sm">
           <PlusIcon />
           <span className="hidden lg:inline">Nueva gira</span>
         </Button>

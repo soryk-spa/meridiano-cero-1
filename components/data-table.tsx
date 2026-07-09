@@ -20,6 +20,7 @@ import {
   ChevronsLeftIcon,
   ChevronsRightIcon,
   ColumnsIcon,
+  EyeIcon,
   ListPlusIcon,
   MoreVerticalIcon,
   PencilIcon,
@@ -87,7 +88,10 @@ function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripN
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem asChild>
-          <Link href={`/admin/trips/${tripId}`}>Ver gira</Link>
+          <Link href={`/admin/trips/${tripId}`}>
+            <EyeIcon className="size-4" />
+            Ver gira
+          </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/admin/trips/${tripId}?edit=1`}>
