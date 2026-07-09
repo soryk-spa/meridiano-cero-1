@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { FetchError } from '@/components/fetch-error'
 
 type Membership = { id: string; role: Role; tripId: string; tripName: string }
@@ -179,113 +180,129 @@ export default function AdminUsersPage() {
               <Skeleton className="h-16 w-full" />
             </CardContent>
           ) : (
-            <CardContent className="flex flex-col gap-1 p-2">
-              {users.length ? (
-                users.map((user) => (
-                  <div
-                    key={user.clerkUserId}
-                    className="flex flex-col gap-3 rounded-md p-3 hover:bg-muted sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarImage src={user.imageUrl} alt={user.name} />
-                        <AvatarFallback>{initialsFor(user.name)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-medium">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {user.isAdmin ? <Badge>Admin</Badge> : null}
-                      {user.memberships.map((membership) => (
-                        <Badge key={membership.id} variant="secondary" className="gap-1 pr-1">
-                          {roleLabels[membership.role]} · {membership.tripName}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveMembership(membership)}
-                            disabled={removingMembershipId === membership.id}
-                            className="rounded-full p-0.5 hover:bg-foreground/10"
-                          >
-                            <XIcon className="size-3" />
-                            <span className="sr-only">Quitar</span>
-                          </button>
-                        </Badge>
-                      ))}
-                      {!user.isAdmin && user.memberships.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">Sin rol asignado</span>
-                      ) : null}
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleToggleAdmin(user)}
-                        disabled={togglingAdminId === user.clerkUserId}
-                      >
-                        <ShieldIcon />
-                        {user.isAdmin ? 'Quitar admin' : 'Hacer admin'}
-                      </Button>
-                      <Dialog
-                        open={assignOpen?.clerkUserId === user.clerkUserId}
-                        onOpenChange={(open) => !open && setAssignOpen(null)}
-                      >
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)}>
-                            <UserPlusIcon />
-                            Asociar a gira
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Asociar a una gira</DialogTitle>
-                          </DialogHeader>
-                          <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-2">
-                              <Label>Gira</Label>
-                              <Select value={assignTripId} onValueChange={setAssignTripId}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecciona una gira" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {trips.map((trip) => (
-                                    <SelectItem key={trip.id} value={trip.id}>
-                                      {trip.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                              <Label>Rol</Label>
-                              <Select value={assignRole} onValueChange={(value) => setAssignRole(value as Role)}>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="PARENT">Apoderado</SelectItem>
-                                  <SelectItem value="MONITOR">Monitor</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            {assignError ? <p className="text-sm text-destructive">{assignError}</p> : null}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Usuario</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.length ? (
+                  users.map((user) => (
+                    <TableRow key={user.clerkUserId}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={user.imageUrl} alt={user.name} />
+                            <AvatarFallback>{initialsFor(user.name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{user.name}</span>
+                            <span className="text-xs text-muted-foreground">{user.email}</span>
                           </div>
-                          <DialogFooter>
-                            <Button onClick={handleAssign} disabled={assigning || !assignTripId}>
-                              {assigning ? 'Asociando…' : 'Asociar'}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="p-3 text-sm text-muted-foreground">Sin usuarios registrados todavía.</p>
-              )}
-            </CardContent>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {user.isAdmin ? <Badge>Admin</Badge> : null}
+                          {user.memberships.map((membership) => (
+                            <Badge key={membership.id} variant="secondary" className="gap-1 pr-1">
+                              {roleLabels[membership.role]} · {membership.tripName}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveMembership(membership)}
+                                disabled={removingMembershipId === membership.id}
+                                className="rounded-full p-0.5 hover:bg-foreground/10"
+                              >
+                                <XIcon className="size-3" />
+                                <span className="sr-only">Quitar</span>
+                              </button>
+                            </Badge>
+                          ))}
+                          {!user.isAdmin && user.memberships.length === 0 ? (
+                            <span className="text-xs text-muted-foreground">Sin rol asignado</span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleToggleAdmin(user)}
+                            disabled={togglingAdminId === user.clerkUserId}
+                          >
+                            <ShieldIcon />
+                            {user.isAdmin ? 'Quitar admin' : 'Hacer admin'}
+                          </Button>
+                          <Dialog
+                            open={assignOpen?.clerkUserId === user.clerkUserId}
+                            onOpenChange={(open) => !open && setAssignOpen(null)}
+                          >
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)}>
+                                <UserPlusIcon />
+                                Asociar a gira
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Asociar a una gira</DialogTitle>
+                              </DialogHeader>
+                              <div className="flex flex-col gap-4">
+                                <div className="flex flex-col gap-2">
+                                  <Label>Gira</Label>
+                                  <Select value={assignTripId} onValueChange={setAssignTripId}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Selecciona una gira" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {trips.map((trip) => (
+                                        <SelectItem key={trip.id} value={trip.id}>
+                                          {trip.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="flex flex-col gap-2">
+                                  <Label>Rol</Label>
+                                  <Select value={assignRole} onValueChange={(value) => setAssignRole(value as Role)}>
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="PARENT">Apoderado</SelectItem>
+                                      <SelectItem value="MONITOR">Monitor</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                {assignError ? <p className="text-sm text-destructive">{assignError}</p> : null}
+                              </div>
+                              <DialogFooter>
+                                <Button onClick={handleAssign} disabled={assigning || !assignTripId}>
+                                  {assigning ? 'Asociando…' : 'Asociar'}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">
+                      Sin usuarios registrados todavía.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
           )}
         </Card>
 
