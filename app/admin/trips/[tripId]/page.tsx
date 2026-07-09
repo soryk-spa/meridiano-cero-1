@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { CheckIcon, CopyIcon, MailPlusIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
+import { CheckIcon, CopyIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import type { AccessCode, Announcement, ItineraryItem, LocationPing, Role, Trip, TripStatus } from '@prisma/client'
@@ -46,6 +46,7 @@ const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monito
 
 const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '' }
 const EMPTY_ITINERARY_FORM = { time: '', title: '', location: '', description: '' }
+const EMPTY_MONITOR_FORM = { firstName: '', lastName: '', emailAddress: '' }
 
 export default function AdminTripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>()
@@ -59,10 +60,14 @@ export default function AdminTripDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [addingRole, setAddingRole] = useState<Role | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [inviteOpen, setInviteOpen] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviting, setInviting] = useState(false)
-  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [addMonitorOpen, setAddMonitorOpen] = useState(false)
+  const [monitorForm, setMonitorForm] = useState(EMPTY_MONITOR_FORM)
+  const [addingMonitor, setAddingMonitor] = useState(false)
+  const [addMonitorError, setAddMonitorError] = useState<string | null>(null)
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string | null } | null>(
+    null
+  )
+  const [credentialsCopied, setCredentialsCopied] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM)
   const [editDateRange, setEditDateRange] = useState<DateRange | undefined>()
@@ -240,22 +245,40 @@ export default function AdminTripDetailPage() {
     if (res.ok) void load()
   }
 
-  async function handleInviteMonitor() {
-    setInviting(true)
-    setInviteError(null)
-    const res = await fetch(`/api/v1/trips/${tripId}/invite-monitor`, {
+  function openAddMonitor() {
+    setMonitorForm(EMPTY_MONITOR_FORM)
+    setAddMonitorError(null)
+    setCreatedCredentials(null)
+    setCredentialsCopied(false)
+    setAddMonitorOpen(true)
+  }
+
+  async function handleAddMonitor() {
+    setAddingMonitor(true)
+    setAddMonitorError(null)
+    const res = await fetch(`/api/v1/trips/${tripId}/monitors`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emailAddress: inviteEmail }),
+      body: JSON.stringify(monitorForm),
     })
-    setInviting(false)
+    setAddingMonitor(false)
     if (res.ok) {
-      setInviteEmail('')
-      setInviteOpen(false)
+      const data = await res.json()
+      setCreatedCredentials({ email: data.email, password: data.password })
+      void load()
     } else {
       const data = await res.json().catch(() => null)
-      setInviteError(data?.error?.message ?? 'No se pudo enviar la invitación.')
+      setAddMonitorError(data?.error?.message ?? 'No se pudo agregar al monitor.')
     }
+  }
+
+  async function handleCopyCredentials() {
+    if (!createdCredentials?.password) return
+    await navigator.clipboard.writeText(
+      `Correo: ${createdCredentials.email}\nContraseña: ${createdCredentials.password}`
+    )
+    setCredentialsCopied(true)
+    window.setTimeout(() => setCredentialsCopied(false), 1500)
   }
 
   if (!trip) {
@@ -574,44 +597,97 @@ export default function AdminTripDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Monitores ({monitors.length})</CardTitle>
-            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+            <Dialog open={addMonitorOpen} onOpenChange={setAddMonitorOpen}>
               <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setInviteEmail('')
-                    setInviteError(null)
-                  }}
-                >
-                  <MailPlusIcon />
-                  Invitar monitor
+                <Button variant="outline" size="sm" onClick={openAddMonitor}>
+                  <UserPlusIcon />
+                  Agregar monitor
                 </Button>
               </DialogTrigger>
               <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Invitar monitor a esta gira</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="invite-monitor-email">Correo electrónico</Label>
-                  <Input
-                    id="invite-monitor-email"
-                    type="email"
-                    placeholder="nombre@correo.cl"
-                    value={inviteEmail}
-                    onChange={(e) => setInviteEmail(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Se enviará una invitación por correo. Al aceptarla, quedará asociado a esta gira
-                    automáticamente, sin necesidad de código.
-                  </p>
-                  {inviteError ? <p className="text-sm text-destructive">{inviteError}</p> : null}
-                </div>
-                <DialogFooter>
-                  <Button onClick={handleInviteMonitor} disabled={inviting || !inviteEmail}>
-                    {inviting ? 'Enviando…' : 'Enviar invitación'}
-                  </Button>
-                </DialogFooter>
+                {createdCredentials ? (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Monitor agregado</DialogTitle>
+                    </DialogHeader>
+                    {createdCredentials.password ? (
+                      <div className="flex flex-col gap-3">
+                        <p className="text-sm text-muted-foreground">
+                          Comparte estas credenciales con el monitor. La contraseña no se volverá a mostrar.
+                        </p>
+                        <div className="flex flex-col gap-1 rounded-md border bg-muted/50 p-3 font-mono text-sm">
+                          <span>{createdCredentials.email}</span>
+                          <span>{createdCredentials.password}</span>
+                        </div>
+                        <Button variant="outline" onClick={handleCopyCredentials}>
+                          {credentialsCopied ? <CheckIcon /> : <CopyIcon />}
+                          {credentialsCopied ? 'Copiado' : 'Copiar credenciales'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {createdCredentials.email} ya tenía una cuenta y quedó asociado a esta gira.
+                      </p>
+                    )}
+                    <DialogFooter>
+                      <Button onClick={() => setAddMonitorOpen(false)}>Listo</Button>
+                    </DialogFooter>
+                  </>
+                ) : (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle>Agregar monitor a esta gira</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="monitor-first-name">Nombre</Label>
+                          <Input
+                            id="monitor-first-name"
+                            value={monitorForm.firstName}
+                            onChange={(e) => setMonitorForm((p) => ({ ...p, firstName: e.target.value }))}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <Label htmlFor="monitor-last-name">Apellido</Label>
+                          <Input
+                            id="monitor-last-name"
+                            value={monitorForm.lastName}
+                            onChange={(e) => setMonitorForm((p) => ({ ...p, lastName: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="monitor-email">Correo electrónico</Label>
+                        <Input
+                          id="monitor-email"
+                          type="email"
+                          placeholder="nombre@correo.cl"
+                          value={monitorForm.emailAddress}
+                          onChange={(e) => setMonitorForm((p) => ({ ...p, emailAddress: e.target.value }))}
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Se crea la cuenta al tiro con una contraseña generada. Si el correo ya tiene cuenta,
+                        solo se asocia a esta gira.
+                      </p>
+                      {addMonitorError ? <p className="text-sm text-destructive">{addMonitorError}</p> : null}
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        onClick={handleAddMonitor}
+                        disabled={
+                          addingMonitor ||
+                          !monitorForm.firstName.trim() ||
+                          !monitorForm.lastName.trim() ||
+                          !monitorForm.emailAddress.trim()
+                        }
+                      >
+                        {addingMonitor ? 'Creando…' : 'Crear cuenta'}
+                      </Button>
+                    </DialogFooter>
+                  </>
+                )}
               </DialogContent>
             </Dialog>
           </CardHeader>

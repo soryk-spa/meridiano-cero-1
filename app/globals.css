@@ -20,6 +20,7 @@
   --color-border: oklch(0.92 0.004 286.32);
   --color-input: oklch(0.92 0.004 286.32);
   --color-ring: oklch(0.705 0.015 286.067);
+  --color-brand-orange: oklch(0.72 0.191 49.8);
   --radius: 0.5rem;
   --sidebar: hsl(0 0% 98%);
   --sidebar-foreground: hsl(240 5.3% 26.1%);
@@ -52,6 +53,7 @@
   --color-border: oklch(0.22 0 0);
   --color-input: oklch(0.22 0 0);
   --color-ring: oklch(0.55 0 0);
+  --color-brand-orange: oklch(0.72 0.191 49.8);
   --sidebar: hsl(240 5.9% 10%);
   --sidebar-foreground: hsl(240 4.8% 95.9%);
   --sidebar-primary: hsl(224.3 76.3% 48%);
