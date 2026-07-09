@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { MailPlusIcon, Trash2Icon, XIcon } from 'lucide-react'
 import { SiteHeader } from '@/components/site-header'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -37,6 +38,8 @@ function initialsFor(name: string) {
 }
 
 export default function AdminTeamPage() {
+  const searchParams = useSearchParams()
+  const defaultTab = searchParams.get('tab') === 'monitors' ? 'monitors' : 'admins'
   const [admins, setAdmins] = useState<Admin[] | null>(null)
   const [monitors, setMonitors] = useState<Monitor[] | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -140,7 +143,7 @@ export default function AdminTeamPage() {
         {loadError && !admins ? (
           <FetchError message={loadError} onRetry={load} />
         ) : (
-        <Tabs defaultValue="admins">
+        <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="admins">Administradores</TabsTrigger>
             <TabsTrigger value="monitors">Monitores</TabsTrigger>
