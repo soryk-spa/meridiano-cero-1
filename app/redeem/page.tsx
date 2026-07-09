@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle } from 'lucide-react'
-import { Logo } from '@/components/logo'
+import { AlertCircle, Ticket } from 'lucide-react'
 
 export default function RedeemPage() {
   const router = useRouter()
@@ -42,22 +41,17 @@ export default function RedeemPage() {
   }, [router])
 
   return (
-    <div className="relative overflow-hidden min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/branding/ELEMENTOS DECORATIVOS/forma-1-azul.png"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -bottom-16 -right-16 -z-10 w-[420px] max-w-none opacity-15 select-none"
-      />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm text-center space-y-4">
-        <Logo variant="blanco" className="h-10 w-auto mx-auto" />
+        <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-white/10">
+          <Ticket className="text-white" size={24} />
+        </div>
         {status === 'checking' ? (
           <span className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
         ) : (
           <div className="space-y-2">
             <AlertCircle className="mx-auto text-white/70" size={28} />
-            <h1 className="font-display text-xl text-white">Sin acceso todavía</h1>
+            <h1 className="text-xl font-semibold text-white">Sin acceso todavía</h1>
             <p className="text-slate-400 text-sm">
               Tu cuenta no tiene acceso a la plataforma. Pide a un administrador que te invite.
             </p>

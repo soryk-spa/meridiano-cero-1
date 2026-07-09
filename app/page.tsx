@@ -17,7 +17,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { HeroGlobe } from '@/components/hero-globe'
 import StatusBadge from '@/components/StatusBadge'
-import { Logo } from '@/components/logo'
 
 const MOCK_NAV = [
   { label: 'Dashboard', icon: IconDashboard, active: true },
@@ -77,8 +76,11 @@ function LandingPage() {
     <main className="min-h-screen bg-background">
       <header className="border-b">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center">
-            <Logo variant="naranja" className="h-8 w-auto" />
+          <Link href="/" className="flex items-center gap-2 font-semibold">
+            <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+              <MapPin size={17} />
+            </span>
+            Meridiano Cero
           </Link>
           <nav className="flex items-center gap-2">
             <Button variant="ghost" asChild>
@@ -91,27 +93,12 @@ function LandingPage() {
         </div>
       </header>
 
-      <section className="relative overflow-hidden">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/branding/ELEMENTOS DECORATIVOS/MANCHA-NARANJA.png"
-          alt=""
-          aria-hidden
-          className="pointer-events-none absolute -top-32 -right-32 -z-10 w-[600px] max-w-none opacity-10 blur-3xl select-none"
-        />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/branding/ELEMENTOS DECORATIVOS/MANCHA-MORADA.png"
-          alt=""
-          aria-hidden
-          className="pointer-events-none absolute -bottom-32 -left-32 -z-10 w-[600px] max-w-none opacity-10 blur-3xl select-none"
-        />
-        <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl content-center gap-10 px-4 py-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl content-center gap-10 px-4 py-12 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
         <div className="max-w-2xl">
           <Badge variant="outline" className="mb-5">
             Plataforma para giras escolares
           </Badge>
-          <h1 className="font-display text-4xl leading-tight text-foreground md:text-6xl">
+          <h1 className="text-4xl font-semibold leading-tight text-foreground md:text-6xl">
             Meridiano Cero
           </h1>
           <p className="mt-5 text-lg leading-8 text-muted-foreground">
@@ -161,8 +148,11 @@ function LandingPage() {
           <div className="mt-8 rounded-lg border bg-card p-3 shadow-sm">
             <div className="grid min-h-[430px] overflow-hidden rounded-md border bg-muted/30 md:grid-cols-[200px_1fr]">
               <aside className="hidden border-r bg-sidebar p-3 md:block">
-                <div className="mb-4 flex items-center px-1 text-sidebar-foreground">
-                  <Logo variant="gris" className="h-4 w-auto" />
+                <div className="mb-4 flex items-center gap-2 px-1 text-sm font-semibold text-sidebar-foreground">
+                  <span className="flex size-6 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                    <MapPin size={13} />
+                  </span>
+                  Meridiano Cero
                 </div>
                 {MOCK_NAV.map(({ label, icon: Icon, active }) => (
                   <div
@@ -243,7 +233,6 @@ function LandingPage() {
           <Link href="/sign-in" className="font-medium text-foreground hover:underline">
             Ir a la plataforma
           </Link>
-        </div>
         </div>
       </section>
     </main>
