@@ -8,7 +8,6 @@ import {
   IconDashboard,
   IconDatabase,
   IconHelp,
-  IconInnerShadowTop,
   IconMap,
   IconMapPinPlus,
   IconReport,
@@ -31,7 +30,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
@@ -81,15 +79,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
-            >
-              <Link href="/admin">
-                <IconInnerShadowTop className="size-5!" />
-                <span className="text-base font-semibold">Meridiano Cero</span>
-              </Link>
-            </SidebarMenuButton>
+            <Link href="/admin" className="flex items-center justify-center p-1.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/branding/ELEMENTOS DECORATIVOS/ROSA NARANJA.png"
+                alt="Meridiano Cero"
+                className="size-7"
+              />
+            </Link>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
