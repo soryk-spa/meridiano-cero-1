@@ -9,6 +9,12 @@ async function requireClerkUserId(): Promise<string> {
   return userId
 }
 
+/** Any signed-in user, regardless of trip membership or admin status. */
+export async function requireAuthenticated() {
+  const clerkUserId = await requireClerkUserId()
+  return { clerkUserId }
+}
+
 /** Admin can write to any trip; otherwise the caller must hold one of the given roles on it. */
 export async function requireTripWrite(tripId: string, roles: Role[]) {
   const clerkUserId = await requireClerkUserId()

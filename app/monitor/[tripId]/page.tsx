@@ -15,17 +15,16 @@ import {
   Trash2,
   Loader2,
 } from 'lucide-react'
-import type { Trip, ItineraryItem, ItineraryStatus, TripStatus } from '@prisma/client'
+import type { AnnouncementTemplate, Trip, ItineraryItem, ItineraryStatus, TripStatus } from '@prisma/client'
 import { tripStatusLabels, itineraryStatusLabels } from '@/lib/labels'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
-const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'EMERGENCY']
+const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING']
 
 const NEXT_ITINERARY_STATUS: Record<ItineraryStatus, ItineraryStatus> = {
   PENDING: 'IN_PROGRESS',
@@ -55,20 +54,24 @@ export default function MonitorPage() {
 
   const [trip, setTrip] = useState<Trip | null>(null)
   const [items, setItems] = useState<ItineraryItem[]>([])
-  const [tracking, setTracking] = useState(false)
+  const [tracking, setTracking] = useState(true)
   const [gps, setGps] = useState<GpsPoint | null>(null)
-  const [message, setMessage] = useState('')
+  const [templates, setTemplates] = useState<AnnouncementTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
   const [sent, setSent] = useState<string[]>([])
   const [uploadingId, setUploadingId] = useState<string | null>(null)
+  const [sendingRequirementsId, setSendingRequirementsId] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingItemId = useRef<string | null>(null)
 
   useEffect(() => {
     async function load() {
-      const [tripRes, itineraryRes] = await Promise.all([
+      const [tripRes, itineraryRes, templatesRes] = await Promise.all([
         fetch(`/api/v1/trips/${tripId}`),
         fetch(`/api/v1/trips/${tripId}/itinerary`),
+        fetch('/api/v1/announcement-templates'),
       ])
       if (tripRes.ok) {
         const { trip: loadedTrip } = await tripRes.json()
@@ -76,6 +79,7 @@ export default function MonitorPage() {
         setGps({ lat: loadedTrip.initialLat, lng: loadedTrip.initialLng, accuracy: 12, updatedAt: new Date() })
       }
       if (itineraryRes.ok) setItems((await itineraryRes.json()).items)
+      if (templatesRes.ok) setTemplates((await templatesRes.json()).templates)
     }
     load()
   }, [tripId])
@@ -130,17 +134,42 @@ export default function MonitorPage() {
   }
 
   async function sendAnnouncement() {
-    const text = message.trim()
-    if (!text) return
-    setMessage('')
+    const template = templates.find((t) => t.id === selectedTemplateId)
+    if (!template) return
 
-    const title = text.length > 60 ? `${text.slice(0, 57)}…` : text
+    setSending(true)
     const res = await fetch(`/api/v1/trips/${tripId}/announcements`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, message: text, authorName: user?.fullName ?? 'Monitor' }),
+      body: JSON.stringify({
+        title: template.title,
+        message: template.message,
+        authorName: user?.fullName ?? 'Monitor',
+        type: template.type,
+      }),
     })
-    if (res.ok) setSent((p) => [text, ...p])
+    setSending(false)
+    if (res.ok) {
+      setSent((p) => [template.message, ...p])
+      setSelectedTemplateId(null)
+    }
+  }
+
+  async function sendRequirements(item: ItineraryItem) {
+    if (!item.requirementsMessage) return
+    setSendingRequirementsId(item.id)
+    const res = await fetch(`/api/v1/trips/${tripId}/announcements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `Requisitos: ${item.title}`,
+        message: item.requirementsMessage,
+        authorName: user?.fullName ?? 'Monitor',
+        type: 'INFO',
+      }),
+    })
+    setSendingRequirementsId(null)
+    if (res.ok) setSent((p) => [item.requirementsMessage as string, ...p])
   }
 
   async function cycleItemStatus(id: string) {
@@ -263,14 +292,32 @@ export default function MonitorPage() {
                   <CardTitle className="text-sm">Publicar comunicado</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <Textarea
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Escribe un mensaje para los apoderados..."
-                    rows={3}
-                  />
-                  <Button onClick={sendAnnouncement} disabled={!message.trim()} className="w-full">
-                    <Send size={14} /> Publicar
+                  {templates.length ? (
+                    <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+                      {templates.map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setSelectedTemplateId(t.id)}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                            selectedTemplateId === t.id
+                              ? 'border-primary bg-primary/5'
+                              : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <p className="font-medium">{t.title}</p>
+                          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{t.message}</p>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      No hay mensajes predeterminados configurados. Pídele al administrador que agregue
+                      algunos en Mensajes.
+                    </p>
+                  )}
+                  <Button onClick={sendAnnouncement} disabled={!selectedTemplateId || sending} className="w-full">
+                    <Send size={14} /> {sending ? 'Publicando…' : 'Publicar'}
                   </Button>
                   {sent.slice(0, 2).map((m, i) => (
                     <div key={i} className="alert-success rounded-lg border px-3 py-2">
@@ -286,73 +333,98 @@ export default function MonitorPage() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">Control de hitos</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-1">
-                  {items.map((item, i) => (
-                    <div key={item.id}>
-                      <div className="flex items-start gap-3 py-3">
-                        <button
-                          onClick={() => cycleItemStatus(item.id)}
-                          className="mt-0.5 shrink-0 rounded-full transition-transform hover:scale-110"
-                          aria-label="Cambiar estado del hito"
-                        >
-                          <ItineraryStatusIcon status={item.status} />
-                        </button>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className={`text-sm font-medium ${item.status === 'COMPLETED' ? 'text-muted-foreground line-through' : ''}`}>
-                              {item.title}
-                            </p>
-                            <Badge variant="outline" className="shrink-0 text-[10px]">
-                              {itineraryStatusLabels[item.status]}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {item.time} · {item.location}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
-
-                          <div className="mt-2 flex items-center gap-2">
-                            {item.photoUrl ? (
-                              <div className="group relative">
-                                <a href={item.photoUrl} target="_blank" rel="noreferrer">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={item.photoUrl}
-                                    alt={item.title}
-                                    className="size-14 rounded-md border object-cover"
-                                  />
-                                </a>
-                                <button
-                                  onClick={() => removePhoto(item.id)}
-                                  disabled={uploadingId === item.id}
-                                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
-                                  aria-label="Quitar foto"
-                                >
-                                  <Trash2 size={11} />
-                                </button>
-                              </div>
-                            ) : (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => triggerPhotoUpload(item.id)}
-                                disabled={uploadingId === item.id}
+                <CardContent className="space-y-4">
+                  {Object.entries(
+                    items.reduce<Record<number, ItineraryItem[]>>((groups, item) => {
+                      ;(groups[item.dayNumber] ??= []).push(item)
+                      return groups
+                    }, {})
+                  )
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([day, dayItems]) => (
+                      <div key={day} className="space-y-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Día {day}
+                        </p>
+                        {dayItems.map((item, i) => (
+                          <div key={item.id}>
+                            <div className="flex items-start gap-3 py-3">
+                              <button
+                                onClick={() => cycleItemStatus(item.id)}
+                                className="mt-0.5 shrink-0 rounded-full transition-transform hover:scale-110"
+                                aria-label="Cambiar estado del hito"
                               >
-                                {uploadingId === item.id ? (
-                                  <Loader2 size={14} className="animate-spin" />
-                                ) : (
-                                  <Camera size={14} />
-                                )}
-                                Agregar foto
-                              </Button>
-                            )}
+                                <ItineraryStatusIcon status={item.status} />
+                              </button>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className={`text-sm font-medium ${item.status === 'COMPLETED' ? 'text-muted-foreground line-through' : ''}`}>
+                                    {item.title}
+                                  </p>
+                                  <Badge variant="outline" className="shrink-0 text-[10px]">
+                                    {itineraryStatusLabels[item.status]}
+                                  </Badge>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {item.time} · {item.location}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  {item.photoUrl ? (
+                                    <div className="group relative">
+                                      <a href={item.photoUrl} target="_blank" rel="noreferrer">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img
+                                          src={item.photoUrl}
+                                          alt={item.title}
+                                          className="size-14 rounded-md border object-cover"
+                                        />
+                                      </a>
+                                      <button
+                                        onClick={() => removePhoto(item.id)}
+                                        disabled={uploadingId === item.id}
+                                        className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-destructive text-destructive-foreground opacity-0 transition-opacity group-hover:opacity-100"
+                                        aria-label="Quitar foto"
+                                      >
+                                        <Trash2 size={11} />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => triggerPhotoUpload(item.id)}
+                                      disabled={uploadingId === item.id}
+                                    >
+                                      {uploadingId === item.id ? (
+                                        <Loader2 size={14} className="animate-spin" />
+                                      ) : (
+                                        <Camera size={14} />
+                                      )}
+                                      Agregar foto
+                                    </Button>
+                                  )}
+                                  {item.requirementsMessage ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => sendRequirements(item)}
+                                      disabled={sendingRequirementsId === item.id}
+                                    >
+                                      <Send size={14} />
+                                      {sendingRequirementsId === item.id ? 'Enviando…' : 'Enviar requisitos'}
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                            {i < dayItems.length - 1 && <Separator />}
                           </div>
-                        </div>
+                        ))}
                       </div>
-                      {i < items.length - 1 && <Separator />}
-                    </div>
-                  ))}
+                    ))}
                 </CardContent>
               </Card>
             </div>

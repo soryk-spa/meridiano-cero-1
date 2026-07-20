@@ -344,7 +344,7 @@ async function main() {
         schoolId: losAndes.id,
         startDate: new Date('2026-06-15'),
         endDate: new Date('2026-06-21'),
-        status: TripStatus.EMERGENCY,
+        status: TripStatus.IN_ACTIVITY,
         currentDay: 4,
         totalDays: 6,
         studentCount: 30,

@@ -17,7 +17,6 @@ enum TripStatus {
   IN_TRANSIT
   IN_ACTIVITY
   RESTING
-  EMERGENCY
   FINISHED
 }
 
@@ -89,16 +88,18 @@ model TripMembership {
 }
 
 model ItineraryItem {
-  id          String          @id @default(cuid())
-  tripId      String
-  trip        Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  time        String
-  title       String
-  location    String
-  description String
-  status      ItineraryStatus @default(PENDING)
-  order       Int
-  photoUrl    String?
+  id                  String          @id @default(cuid())
+  tripId              String
+  trip                Trip            @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  dayNumber           Int             @default(1)
+  time                String
+  title               String
+  location            String
+  description         String
+  status              ItineraryStatus @default(PENDING)
+  order               Int
+  photoUrl            String?
+  requirementsMessage String?
 }
 
 model Announcement {
@@ -111,6 +112,24 @@ model Announcement {
   type       AnnouncementType @default(INFO)
   photoUrl   String?
   createdAt  DateTime         @default(now())
+}
+
+model AnnouncementTemplate {
+  id        String           @id @default(cuid())
+  title     String
+  message   String
+  type      AnnouncementType @default(INFO)
+  category  String?
+  createdAt DateTime         @default(now())
+}
+
+model ActivityTemplate {
+  id                  String   @id @default(cuid())
+  title               String
+  defaultLocation     String?
+  description         String
+  requirementsMessage String?
+  createdAt           DateTime @default(now())
 }
 
 model RedeemAttempt {

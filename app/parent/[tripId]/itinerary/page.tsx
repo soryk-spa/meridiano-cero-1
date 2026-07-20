@@ -118,10 +118,24 @@ export default function ItineraryPage() {
 
         {/* Timeline */}
         <Card className="lg:col-span-2">
-          <CardContent className="pt-6">
-            {itinerary.map((item, i) => (
-              <TimelineItem key={item.id} item={item} isLast={i === itinerary.length - 1} />
-            ))}
+          <CardContent className="space-y-6 pt-6">
+            {Object.entries(
+              itinerary.reduce<Record<number, typeof itinerary>>((groups, item) => {
+                ;(groups[item.dayNumber] ??= []).push(item)
+                return groups
+              }, {})
+            )
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([day, dayItems]) => (
+                <div key={day}>
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Día {day}
+                  </p>
+                  {dayItems.map((item, i) => (
+                    <TimelineItem key={item.id} item={item} isLast={i === dayItems.length - 1} />
+                  ))}
+                </div>
+              ))}
           </CardContent>
         </Card>
       </div>

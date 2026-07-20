@@ -10,11 +10,13 @@ import { withApiHandler } from '@/lib/api/handler'
 
 const bodySchema = z.object({
   status: z.enum(ItineraryStatus).optional(),
+  dayNumber: z.number().int().min(1).optional(),
   time: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1).optional(),
   location: z.string().trim().min(1).optional(),
   description: z.string().trim().min(1).optional(),
   order: z.number().int().nonnegative().optional(),
+  requirementsMessage: z.string().trim().min(1).nullable().optional(),
 })
 
 export const PATCH = withApiHandler<{ tripId: string; itemId: string }>(async (request, { params }) => {

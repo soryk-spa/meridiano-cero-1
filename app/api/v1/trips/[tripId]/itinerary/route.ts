@@ -19,11 +19,13 @@ export const GET = withApiHandler<{ tripId: string }>(async (_request, { params 
 })
 
 const bodySchema = z.object({
+  dayNumber: z.number().int().min(1),
   time: z.string().trim().min(1),
   title: z.string().trim().min(1),
   location: z.string().trim().min(1),
   description: z.string().trim().min(1),
   order: z.number().int().nonnegative().optional(),
+  requirementsMessage: z.string().trim().min(1).optional(),
 })
 
 export const POST = withApiHandler<{ tripId: string }>(async (request, { params }) => {

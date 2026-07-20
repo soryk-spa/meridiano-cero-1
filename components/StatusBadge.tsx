@@ -5,7 +5,6 @@ const cfg: Record<TripStatus, { dot: string; chip: string }> = {
   IN_TRANSIT: { dot: 'bg-amber-500', chip: 'chip-amber' },
   IN_ACTIVITY: { dot: 'bg-blue-500', chip: 'chip-blue' },
   RESTING: { dot: 'bg-green-500', chip: 'chip-green' },
-  EMERGENCY: { dot: 'bg-red-500', chip: 'chip-red' },
   FINISHED: { dot: 'bg-slate-400', chip: 'chip-slate' },
 }
 

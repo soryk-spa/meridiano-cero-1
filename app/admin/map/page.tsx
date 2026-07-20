@@ -27,7 +27,6 @@ const STATUS_COLOR: Record<TripStatus, string> = {
   IN_TRANSIT: '#f59e0b',
   IN_ACTIVITY: '#3b82f6',
   RESTING: '#22c55e',
-  EMERGENCY: '#ef4444',
   FINISHED: '#94a3b8',
 }
 

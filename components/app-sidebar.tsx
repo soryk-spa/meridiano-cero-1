@@ -5,11 +5,13 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   IconChartBar,
+  IconClipboardList,
   IconDashboard,
   IconDatabase,
   IconHelp,
   IconMap,
   IconMapPinPlus,
+  IconMessage2,
   IconReport,
   IconRoute,
   IconSearch,
@@ -46,6 +48,8 @@ const documentItems = [
   { name: "Códigos", url: "/admin/codes", icon: IconTicket },
   { name: "Reportes", url: "/admin/reports", icon: IconReport },
   { name: "Colegios", url: "/admin/schools", icon: IconDatabase },
+  { name: "Mensajes", url: "/admin/messages", icon: IconMessage2 },
+  { name: "Actividades", url: "/admin/activities", icon: IconClipboardList },
 ]
 
 const data = {

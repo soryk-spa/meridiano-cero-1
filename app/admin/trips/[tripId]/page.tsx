@@ -6,12 +6,22 @@ import dynamic from 'next/dynamic'
 import { CheckIcon, CopyIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
-import type { AccessCode, Announcement, ItineraryItem, LocationPing, Role, Trip, TripStatus } from '@prisma/client'
+import type {
+  AccessCode,
+  ActivityTemplate,
+  Announcement,
+  ItineraryItem,
+  LocationPing,
+  Role,
+  Trip,
+  TripStatus,
+} from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import StatusBadge from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Combobox } from '@/components/ui/combobox'
 import { DateRangePicker } from '@/components/date-range-picker'
 import {
   Dialog,
@@ -41,11 +51,18 @@ type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type ParentRow = { id: string; name: string; email: string }
 type MonitorRow = { id: string; name: string; email: string }
 
-const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'EMERGENCY', 'FINISHED']
+const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'FINISHED']
 const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
 
 const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '' }
-const EMPTY_ITINERARY_FORM = { time: '', title: '', location: '', description: '' }
+const EMPTY_ITINERARY_FORM = {
+  dayNumber: '1',
+  time: '',
+  title: '',
+  location: '',
+  description: '',
+  requirementsMessage: '',
+}
 const EMPTY_MONITOR_FORM = { firstName: '', lastName: '', emailAddress: '' }
 
 export default function AdminTripDetailPage() {
@@ -80,16 +97,20 @@ export default function AdminTripDetailPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [savingItinerary, setSavingItinerary] = useState(false)
   const [itineraryError, setItineraryError] = useState<string | null>(null)
+  const [activityTemplates, setActivityTemplates] = useState<ActivityTemplate[]>([])
+  const [selectedActivityTemplateId, setSelectedActivityTemplateId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [tripRes, itineraryRes, announcementsRes, locationRes, codesRes, rosterRes] = await Promise.all([
-      fetch(`/api/v1/trips/${tripId}`),
-      fetch(`/api/v1/trips/${tripId}/itinerary`),
-      fetch(`/api/v1/trips/${tripId}/announcements`),
-      fetch(`/api/v1/trips/${tripId}/location`),
-      fetch(`/api/v1/admin/codes?tripId=${tripId}`),
-      fetch(`/api/v1/trips/${tripId}/roster`),
-    ])
+    const [tripRes, itineraryRes, announcementsRes, locationRes, codesRes, rosterRes, activityTemplatesRes] =
+      await Promise.all([
+        fetch(`/api/v1/trips/${tripId}`),
+        fetch(`/api/v1/trips/${tripId}/itinerary`),
+        fetch(`/api/v1/trips/${tripId}/announcements`),
+        fetch(`/api/v1/trips/${tripId}/location`),
+        fetch(`/api/v1/admin/codes?tripId=${tripId}`),
+        fetch(`/api/v1/trips/${tripId}/roster`),
+        fetch('/api/v1/admin/activity-templates'),
+      ])
     if (tripRes.ok) setTrip((await tripRes.json()).trip)
     if (itineraryRes.ok) setItinerary((await itineraryRes.json()).items)
     if (announcementsRes.ok) setAnnouncements((await announcementsRes.json()).announcements)
@@ -100,6 +121,7 @@ export default function AdminTripDetailPage() {
       setParents(roster.parents)
       setMonitors(roster.monitors)
     }
+    if (activityTemplatesRes.ok) setActivityTemplates((await activityTemplatesRes.json()).activityTemplates)
   }, [tripId])
 
   useEffect(() => {
@@ -192,6 +214,7 @@ export default function AdminTripDetailPage() {
   function openCreateItinerary() {
     setEditingItemId(null)
     setItineraryForm(EMPTY_ITINERARY_FORM)
+    setSelectedActivityTemplateId(null)
     setItineraryError(null)
     setItineraryOpen(true)
   }
@@ -199,18 +222,46 @@ export default function AdminTripDetailPage() {
   function openEditItinerary(item: ItineraryItem) {
     setEditingItemId(item.id)
     setItineraryForm({
+      dayNumber: String(item.dayNumber),
       time: item.time,
       title: item.title,
       location: item.location,
       description: item.description,
+      requirementsMessage: item.requirementsMessage ?? '',
     })
+    setSelectedActivityTemplateId(null)
     setItineraryError(null)
     setItineraryOpen(true)
+  }
+
+  function handleSelectActivityTemplate(id: string | null) {
+    setSelectedActivityTemplateId(id)
+    const template = activityTemplates.find((t) => t.id === id)
+    if (!template) return
+    setItineraryForm((p) => ({
+      ...p,
+      title: template.title,
+      location: template.defaultLocation ?? p.location,
+      description: template.description,
+      requirementsMessage: template.requirementsMessage ?? '',
+    }))
   }
 
   async function handleSaveItinerary() {
     setSavingItinerary(true)
     setItineraryError(null)
+    const body: Record<string, unknown> = {
+      dayNumber: Number(itineraryForm.dayNumber),
+      time: itineraryForm.time,
+      title: itineraryForm.title,
+      location: itineraryForm.location,
+      description: itineraryForm.description,
+    }
+    if (itineraryForm.requirementsMessage.trim()) {
+      body.requirementsMessage = itineraryForm.requirementsMessage.trim()
+    } else if (editingItemId) {
+      body.requirementsMessage = null
+    }
     const res = await fetch(
       editingItemId
         ? `/api/v1/trips/${tripId}/itinerary/${editingItemId}`
@@ -218,7 +269,7 @@ export default function AdminTripDetailPage() {
       {
         method: editingItemId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(itineraryForm),
+        body: JSON.stringify(body),
       }
     )
     setSavingItinerary(false)
@@ -449,7 +500,39 @@ export default function AdminTripDetailPage() {
                     <DialogTitle>{editingItemId ? 'Editar ítem' : 'Nuevo ítem de itinerario'}</DialogTitle>
                   </DialogHeader>
                   <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label>Actividad de la biblioteca (opcional)</Label>
+                      <Combobox
+                        options={activityTemplates.map((t) => ({
+                          value: t.id,
+                          label: t.title,
+                          description: t.defaultLocation ?? undefined,
+                        }))}
+                        value={selectedActivityTemplateId}
+                        onSelect={handleSelectActivityTemplate}
+                        placeholder="Elegir de la biblioteca…"
+                        emptyLabel="Sin actividades en la biblioteca."
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div className="flex flex-col gap-2">
+                        <Label htmlFor="itinerary-day">Día</Label>
+                        <Select
+                          value={itineraryForm.dayNumber}
+                          onValueChange={(value) => setItineraryForm((p) => ({ ...p, dayNumber: value }))}
+                        >
+                          <SelectTrigger id="itinerary-day">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: trip.totalDays }, (_, i) => i + 1).map((day) => (
+                              <SelectItem key={day} value={String(day)}>
+                                Día {day}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                       <div className="flex flex-col gap-2">
                         <Label htmlFor="itinerary-time">Hora</Label>
                         <Input
@@ -484,6 +567,18 @@ export default function AdminTripDetailPage() {
                         onChange={(e) => setItineraryForm((p) => ({ ...p, description: e.target.value }))}
                       />
                     </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="itinerary-requirements">Requisitos para apoderados (opcional)</Label>
+                      <Textarea
+                        id="itinerary-requirements"
+                        placeholder="Ej: traer ropa de abrigo y llegar 15 min antes."
+                        value={itineraryForm.requirementsMessage}
+                        onChange={(e) => setItineraryForm((p) => ({ ...p, requirementsMessage: e.target.value }))}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        El monitor podrá enviarlo como comunicado con un toque desde la app.
+                      </p>
+                    </div>
                     {itineraryError ? <p className="text-sm text-destructive">{itineraryError}</p> : null}
                   </div>
                   <DialogFooter>
@@ -503,43 +598,60 @@ export default function AdminTripDetailPage() {
                 </DialogContent>
               </Dialog>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3">
+            <CardContent className="flex flex-col gap-4">
               {itinerary.length ? (
-                itinerary.map((item) => (
-                  <div key={item.id} className="flex items-start justify-between gap-3 border-b pb-3 last:border-0 last:pb-0">
-                    <div className="flex items-start gap-3">
-                      {item.photoUrl ? (
-                        <a href={item.photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.photoUrl}
-                            alt={item.title}
-                            className="size-10 rounded-md border object-cover"
-                          />
-                        </a>
-                      ) : null}
-                      <div>
-                        <p className="text-sm font-medium">
-                          {item.time} · {item.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{item.location}</p>
-                      </div>
+                Object.entries(
+                  itinerary.reduce<Record<number, ItineraryItem[]>>((groups, item) => {
+                    ;(groups[item.dayNumber] ??= []).push(item)
+                    return groups
+                  }, {})
+                )
+                  .sort(([a], [b]) => Number(a) - Number(b))
+                  .map(([day, items]) => (
+                    <div key={day} className="flex flex-col gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Día {day}
+                      </p>
+                      {items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="flex items-start justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
+                        >
+                          <div className="flex items-start gap-3">
+                            {item.photoUrl ? (
+                              <a href={item.photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={item.photoUrl}
+                                  alt={item.title}
+                                  className="size-10 rounded-md border object-cover"
+                                />
+                              </a>
+                            ) : null}
+                            <div>
+                              <p className="text-sm font-medium">
+                                {item.time} · {item.title}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{item.location}</p>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <span className="text-xs font-medium text-muted-foreground">
+                              {itineraryStatusLabels[item.status]}
+                            </span>
+                            <Button variant="ghost" size="icon" onClick={() => openEditItinerary(item)}>
+                              <PencilIcon className="size-4" />
+                              <span className="sr-only">Editar ítem</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteItinerary(item.id)}>
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Eliminar ítem</span>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {itineraryStatusLabels[item.status]}
-                      </span>
-                      <Button variant="ghost" size="icon" onClick={() => openEditItinerary(item)}>
-                        <PencilIcon className="size-4" />
-                        <span className="sr-only">Editar ítem</span>
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDeleteItinerary(item.id)}>
-                        <Trash2Icon className="size-4" />
-                        <span className="sr-only">Eliminar ítem</span>
-                      </Button>
-                    </div>
-                  </div>
-                ))
+                  ))
               ) : (
                 <p className="text-sm text-muted-foreground">Sin ítems de itinerario.</p>
               )}

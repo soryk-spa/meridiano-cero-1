@@ -4,7 +4,6 @@ export const tripStatusLabels: Record<TripStatus, string> = {
   IN_TRANSIT: 'En ruta',
   IN_ACTIVITY: 'En actividad',
   RESTING: 'Descansando',
-  EMERGENCY: 'Emergencia',
   FINISHED: 'Finalizado',
 }
 
