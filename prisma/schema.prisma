@@ -58,8 +58,8 @@ model Trip {
   studentCount Int
   initialLat   Float
   initialLng   Float
-  programId    String?
-  program      Program?   @relation(fields: [programId], references: [id])
+  programId    String
+  program      Program    @relation(fields: [programId], references: [id], onDelete: Restrict)
   createdAt    DateTime   @default(now())
 
   memberships    TripMembership[]

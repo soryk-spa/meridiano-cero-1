@@ -47,6 +47,14 @@ export const DELETE = withApiHandler<{ id: string }>(async (_request, { params }
   const existing = await prisma.program.findUnique({ where: { id } })
   if (!existing) throw new ApiError('NOT_FOUND', 'Program not found.')
 
+  const tripCount = await prisma.trip.count({ where: { programId: id } })
+  if (tripCount > 0) {
+    throw new ApiError(
+      'VALIDATION_ERROR',
+      `Cannot delete: ${tripCount} trip${tripCount === 1 ? '' : 's'} still use${tripCount === 1 ? 's' : ''} this program.`
+    )
+  }
+
   await prisma.program.delete({ where: { id } })
 
   return NextResponse.json({ ok: true })

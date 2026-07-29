@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { CommandMenu } from "@/components/command-menu"
 import { CommandMenuProvider } from "@/lib/command-menu-context"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { Toaster } from "@/components/ui/sonner"
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies()
@@ -24,6 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <SidebarInset>{children}</SidebarInset>
       </SidebarProvider>
       <CommandMenu />
+      <Toaster position="top-right" richColors />
     </CommandMenuProvider>
   )
 }

@@ -6,6 +6,35 @@ function minutesAgo(minutes: number): Date {
   return new Date(Date.now() - minutes * 60 * 1000)
 }
 
+type SeedItineraryItem = {
+  time: string
+  title: string
+  location: string
+  description: string
+  status: ItineraryStatus
+  order: number
+}
+
+/** Creates a Program mirroring the given itinerary, so every seed trip is traceable to a program. */
+async function createProgramFor(name: string, description: string, itinerary: SeedItineraryItem[]) {
+  return prisma.program.create({
+    data: {
+      name,
+      description,
+      items: {
+        create: itinerary.map((item) => ({
+          dayNumber: 1,
+          time: item.time,
+          title: item.title,
+          location: item.location,
+          description: item.description,
+          order: item.order,
+        })),
+      },
+    },
+  })
+}
+
 async function main() {
   await prisma.locationPing.deleteMany()
   await prisma.announcement.deleteMany()
@@ -13,6 +42,7 @@ async function main() {
   await prisma.tripMembership.deleteMany()
   await prisma.accessCode.deleteMany()
   await prisma.trip.deleteMany()
+  await prisma.program.deleteMany()
   await prisma.school.deleteMany()
 
   const schools = await Promise.all([
@@ -24,10 +54,271 @@ async function main() {
   ])
   const [sanMartin, santaTeresa, ingles, losAndes, sagradosCorazones] = schools
 
+  const barilocheName = '4° Medio B – Bariloche 2026'
+  const barilocheItinerary: SeedItineraryItem[] = [
+    {
+      time: '07:00',
+      title: 'Desayuno en hotel',
+      location: 'Hotel Patagonia, Bariloche',
+      description: 'Desayuno buffet incluido. Hora de salida: 08:45.',
+      status: ItineraryStatus.COMPLETED,
+      order: 1,
+    },
+    {
+      time: '09:00',
+      title: 'Visita Bosque de Arrayanes',
+      location: 'Parque Nac. Nahuel Huapi',
+      description: 'Caminata guiada por el bosque de arrayanes. Duración: 2 horas aprox.',
+      status: ItineraryStatus.COMPLETED,
+      order: 2,
+    },
+    {
+      time: '12:30',
+      title: 'Almuerzo',
+      location: 'Restaurante El Viejo Munich',
+      description: 'Almuerzo en grupo con menú cerrado.',
+      status: ItineraryStatus.COMPLETED,
+      order: 3,
+    },
+    {
+      time: '14:30',
+      title: 'Excursión en lancha',
+      location: 'Lago Nahuel Huapi',
+      description: 'Paseo en lancha con guía especializado. Duración: 2 horas.',
+      status: ItineraryStatus.IN_PROGRESS,
+      order: 4,
+    },
+    {
+      time: '18:00',
+      title: 'Tiempo libre – Centro Cívico',
+      location: 'Centro Cívico, Bariloche',
+      description: 'Tiempo libre. Punto de encuentro a las 19:45 en la plaza.',
+      status: ItineraryStatus.PENDING,
+      order: 5,
+    },
+    {
+      time: '20:30',
+      title: 'Cena en hotel',
+      location: 'Hotel Patagonia, Bariloche',
+      description: 'Cena en el comedor del hotel.',
+      status: ItineraryStatus.PENDING,
+      order: 6,
+    },
+  ]
+  const barilocheProgram = await createProgramFor(
+    barilocheName,
+    `Programa derivado de la gira "${barilocheName}" (Bariloche, Argentina).`,
+    barilocheItinerary
+  )
+
+  const atacamaName = '3° Medio A – San Pedro de Atacama 2026'
+  const atacamaItinerary: SeedItineraryItem[] = [
+    {
+      time: '06:30',
+      title: 'Desayuno en hostal',
+      location: 'Hostal Tulor, San Pedro de Atacama',
+      description: 'Desayuno temprano para aprovechar el día.',
+      status: ItineraryStatus.COMPLETED,
+      order: 1,
+    },
+    {
+      time: '07:30',
+      title: 'Salida a Valle de la Luna',
+      location: 'Valle de la Luna',
+      description: 'Recorrido guiado por formaciones rocosas y miradores.',
+      status: ItineraryStatus.COMPLETED,
+      order: 2,
+    },
+    {
+      time: '11:00',
+      title: 'Caminata en Valle Arcoíris',
+      location: 'Valle Arcoíris',
+      description: 'Caminata moderada, llevar bastante agua.',
+      status: ItineraryStatus.IN_PROGRESS,
+      order: 3,
+    },
+    {
+      time: '14:00',
+      title: 'Almuerzo típico',
+      location: 'San Pedro de Atacama',
+      description: 'Almuerzo en restaurante local con menú típico.',
+      status: ItineraryStatus.PENDING,
+      order: 4,
+    },
+    {
+      time: '16:30',
+      title: 'Observación astronómica',
+      location: 'Observatorio SPACE',
+      description: 'Charla y observación con telescopios. Abrigo necesario.',
+      status: ItineraryStatus.PENDING,
+      order: 5,
+    },
+    {
+      time: '21:00',
+      title: 'Cena y descanso',
+      location: 'Hostal Tulor',
+      description: 'Cena liviana y descanso para el día siguiente.',
+      status: ItineraryStatus.PENDING,
+      order: 6,
+    },
+  ]
+  const atacamaProgram = await createProgramFor(
+    atacamaName,
+    `Programa derivado de la gira "${atacamaName}" (San Pedro de Atacama, Chile).`,
+    atacamaItinerary
+  )
+
+  const valparaisoName = '2° Medio C – Valparaíso y Viña del Mar 2026'
+  const valparaisoItinerary: SeedItineraryItem[] = [
+    {
+      time: '09:00',
+      title: 'Tour por los cerros',
+      location: 'Cerro Alegre, Valparaíso',
+      description: 'Recorrido a pie por los cerros y su arte callejero.',
+      status: ItineraryStatus.COMPLETED,
+      order: 1,
+    },
+    {
+      time: '11:30',
+      title: 'Visita Museo a Cielo Abierto',
+      location: 'Cerro Bellavista',
+      description: 'Recorrido por murales históricos del museo a cielo abierto.',
+      status: ItineraryStatus.COMPLETED,
+      order: 2,
+    },
+    {
+      time: '13:00',
+      title: 'Almuerzo en Caleta Portales',
+      location: 'Caleta Portales',
+      description: 'Almuerzo con productos del mar frente a la caleta.',
+      status: ItineraryStatus.COMPLETED,
+      order: 3,
+    },
+    {
+      time: '15:30',
+      title: 'Tarde libre en la playa',
+      location: 'Playa Las Salinas, Viña del Mar',
+      description: 'Tarde de descanso en la playa, supervisada por los monitores.',
+      status: ItineraryStatus.IN_PROGRESS,
+      order: 4,
+    },
+    {
+      time: '19:00',
+      title: 'Descanso en hospedaje',
+      location: 'Hostal Brisa Marina',
+      description: 'Regreso al hospedaje para descansar antes del último día.',
+      status: ItineraryStatus.PENDING,
+      order: 5,
+    },
+  ]
+  const valparaisoProgram = await createProgramFor(
+    valparaisoName,
+    `Programa derivado de la gira "${valparaisoName}" (Valparaíso, Chile).`,
+    valparaisoItinerary
+  )
+
+  const puconName = '4° Medio A – Pucón y la Araucanía 2026'
+  const puconItinerary: SeedItineraryItem[] = [
+    {
+      time: '08:00',
+      title: 'Desayuno',
+      location: 'Refugio Los Volcanes, Pucón',
+      description: 'Desayuno en el refugio antes de la actividad del día.',
+      status: ItineraryStatus.COMPLETED,
+      order: 1,
+    },
+    {
+      time: '09:30',
+      title: 'Trekking sector Los Pozones',
+      location: 'Los Pozones',
+      description: 'Caminata por sendero habilitado con guías de montaña.',
+      status: ItineraryStatus.COMPLETED,
+      order: 2,
+    },
+    {
+      time: '13:00',
+      title: 'Almuerzo',
+      location: 'Refugio Los Volcanes',
+      description: 'Almuerzo de recuperación tras el trekking.',
+      status: ItineraryStatus.COMPLETED,
+      order: 3,
+    },
+    {
+      time: '15:00',
+      title: 'Termas Geométricas',
+      location: 'Termas Geométricas',
+      description: 'Visita a las termas. Actividad pausada por la novedad reportada.',
+      status: ItineraryStatus.IN_PROGRESS,
+      order: 4,
+    },
+    {
+      time: '19:00',
+      title: 'Cena y reunión informativa',
+      location: 'Refugio Los Volcanes',
+      description: 'Cena y reunión con el equipo para informar a las familias.',
+      status: ItineraryStatus.PENDING,
+      order: 5,
+    },
+  ]
+  const puconProgram = await createProgramFor(
+    puconName,
+    `Programa derivado de la gira "${puconName}" (Pucón, Chile).`,
+    puconItinerary
+  )
+
+  const rapaNuiName = '3° Medio B – Isla de Pascua 2026'
+  const rapaNuiItinerary: SeedItineraryItem[] = [
+    {
+      time: '08:00',
+      title: 'Desayuno',
+      location: 'Hotel Tupa, Hanga Roa',
+      description: 'Desayuno final antes del cierre de la gira.',
+      status: ItineraryStatus.COMPLETED,
+      order: 1,
+    },
+    {
+      time: '09:30',
+      title: 'Visita Ahu Tongariki',
+      location: 'Ahu Tongariki',
+      description: 'Visita al sitio arqueológico más grande de la isla.',
+      status: ItineraryStatus.COMPLETED,
+      order: 2,
+    },
+    {
+      time: '13:00',
+      title: 'Almuerzo',
+      location: 'Hotel Tupa',
+      description: 'Almuerzo de despedida con el grupo completo.',
+      status: ItineraryStatus.COMPLETED,
+      order: 3,
+    },
+    {
+      time: '15:00',
+      title: 'Cráter Rano Raraku',
+      location: 'Rano Raraku',
+      description: 'Visita a la cantera donde se esculpieron los moái.',
+      status: ItineraryStatus.COMPLETED,
+      order: 4,
+    },
+    {
+      time: '19:00',
+      title: 'Cena de despedida',
+      location: 'Hotel Tupa',
+      description: 'Cena de cierre con el grupo antes del vuelo de regreso.',
+      status: ItineraryStatus.COMPLETED,
+      order: 5,
+    },
+  ]
+  const rapaNuiProgram = await createProgramFor(
+    rapaNuiName,
+    `Programa derivado de la gira "${rapaNuiName}" (Isla de Pascua, Chile).`,
+    rapaNuiItinerary
+  )
+
   const trips = await Promise.all([
     prisma.trip.create({
       data: {
-        name: '4° Medio B – Bariloche 2026',
+        name: barilocheName,
         destination: 'Bariloche, Argentina',
         schoolId: sanMartin.id,
         startDate: new Date('2026-06-16'),
@@ -38,64 +329,14 @@ async function main() {
         studentCount: 34,
         initialLat: -41.1335,
         initialLng: -71.3103,
+        programId: barilocheProgram.id,
         accessCodes: {
           create: [
             { code: 'BAR-2026', role: Role.PARENT },
             { code: 'MON-2026', role: Role.MONITOR },
           ],
         },
-        itineraryItems: {
-          create: [
-            {
-              time: '07:00',
-              title: 'Desayuno en hotel',
-              location: 'Hotel Patagonia, Bariloche',
-              description: 'Desayuno buffet incluido. Hora de salida: 08:45.',
-              status: ItineraryStatus.COMPLETED,
-              order: 1,
-            },
-            {
-              time: '09:00',
-              title: 'Visita Bosque de Arrayanes',
-              location: 'Parque Nac. Nahuel Huapi',
-              description: 'Caminata guiada por el bosque de arrayanes. Duración: 2 horas aprox.',
-              status: ItineraryStatus.COMPLETED,
-              order: 2,
-            },
-            {
-              time: '12:30',
-              title: 'Almuerzo',
-              location: 'Restaurante El Viejo Munich',
-              description: 'Almuerzo en grupo con menú cerrado.',
-              status: ItineraryStatus.COMPLETED,
-              order: 3,
-            },
-            {
-              time: '14:30',
-              title: 'Excursión en lancha',
-              location: 'Lago Nahuel Huapi',
-              description: 'Paseo en lancha con guía especializado. Duración: 2 horas.',
-              status: ItineraryStatus.IN_PROGRESS,
-              order: 4,
-            },
-            {
-              time: '18:00',
-              title: 'Tiempo libre – Centro Cívico',
-              location: 'Centro Cívico, Bariloche',
-              description: 'Tiempo libre. Punto de encuentro a las 19:45 en la plaza.',
-              status: ItineraryStatus.PENDING,
-              order: 5,
-            },
-            {
-              time: '20:30',
-              title: 'Cena en hotel',
-              location: 'Hotel Patagonia, Bariloche',
-              description: 'Cena en el comedor del hotel.',
-              status: ItineraryStatus.PENDING,
-              order: 6,
-            },
-          ],
-        },
+        itineraryItems: { create: barilocheItinerary },
         announcements: {
           create: [
             {
@@ -135,7 +376,7 @@ async function main() {
 
     prisma.trip.create({
       data: {
-        name: '3° Medio A – San Pedro de Atacama 2026',
+        name: atacamaName,
         destination: 'San Pedro de Atacama, Chile',
         schoolId: santaTeresa.id,
         startDate: new Date('2026-06-18'),
@@ -146,64 +387,14 @@ async function main() {
         studentCount: 28,
         initialLat: -22.9098,
         initialLng: -68.1997,
+        programId: atacamaProgram.id,
         accessCodes: {
           create: [
             { code: 'ATA-2026', role: Role.PARENT },
             { code: 'MON-ATA', role: Role.MONITOR },
           ],
         },
-        itineraryItems: {
-          create: [
-            {
-              time: '06:30',
-              title: 'Desayuno en hostal',
-              location: 'Hostal Tulor, San Pedro de Atacama',
-              description: 'Desayuno temprano para aprovechar el día.',
-              status: ItineraryStatus.COMPLETED,
-              order: 1,
-            },
-            {
-              time: '07:30',
-              title: 'Salida a Valle de la Luna',
-              location: 'Valle de la Luna',
-              description: 'Recorrido guiado por formaciones rocosas y miradores.',
-              status: ItineraryStatus.COMPLETED,
-              order: 2,
-            },
-            {
-              time: '11:00',
-              title: 'Caminata en Valle Arcoíris',
-              location: 'Valle Arcoíris',
-              description: 'Caminata moderada, llevar bastante agua.',
-              status: ItineraryStatus.IN_PROGRESS,
-              order: 3,
-            },
-            {
-              time: '14:00',
-              title: 'Almuerzo típico',
-              location: 'San Pedro de Atacama',
-              description: 'Almuerzo en restaurante local con menú típico.',
-              status: ItineraryStatus.PENDING,
-              order: 4,
-            },
-            {
-              time: '16:30',
-              title: 'Observación astronómica',
-              location: 'Observatorio SPACE',
-              description: 'Charla y observación con telescopios. Abrigo necesario.',
-              status: ItineraryStatus.PENDING,
-              order: 5,
-            },
-            {
-              time: '21:00',
-              title: 'Cena y descanso',
-              location: 'Hostal Tulor',
-              description: 'Cena liviana y descanso para el día siguiente.',
-              status: ItineraryStatus.PENDING,
-              order: 6,
-            },
-          ],
-        },
+        itineraryItems: { create: atacamaItinerary },
         announcements: {
           create: [
             {
@@ -242,7 +433,7 @@ async function main() {
 
     prisma.trip.create({
       data: {
-        name: '2° Medio C – Valparaíso y Viña del Mar 2026',
+        name: valparaisoName,
         destination: 'Valparaíso, Chile',
         schoolId: ingles.id,
         startDate: new Date('2026-06-17'),
@@ -253,56 +444,14 @@ async function main() {
         studentCount: 32,
         initialLat: -33.0472,
         initialLng: -71.6127,
+        programId: valparaisoProgram.id,
         accessCodes: {
           create: [
             { code: 'VAL-2026', role: Role.PARENT },
             { code: 'MON-VAL', role: Role.MONITOR },
           ],
         },
-        itineraryItems: {
-          create: [
-            {
-              time: '09:00',
-              title: 'Tour por los cerros',
-              location: 'Cerro Alegre, Valparaíso',
-              description: 'Recorrido a pie por los cerros y su arte callejero.',
-              status: ItineraryStatus.COMPLETED,
-              order: 1,
-            },
-            {
-              time: '11:30',
-              title: 'Visita Museo a Cielo Abierto',
-              location: 'Cerro Bellavista',
-              description: 'Recorrido por murales históricos del museo a cielo abierto.',
-              status: ItineraryStatus.COMPLETED,
-              order: 2,
-            },
-            {
-              time: '13:00',
-              title: 'Almuerzo en Caleta Portales',
-              location: 'Caleta Portales',
-              description: 'Almuerzo con productos del mar frente a la caleta.',
-              status: ItineraryStatus.COMPLETED,
-              order: 3,
-            },
-            {
-              time: '15:30',
-              title: 'Tarde libre en la playa',
-              location: 'Playa Las Salinas, Viña del Mar',
-              description: 'Tarde de descanso en la playa, supervisada por los monitores.',
-              status: ItineraryStatus.IN_PROGRESS,
-              order: 4,
-            },
-            {
-              time: '19:00',
-              title: 'Descanso en hospedaje',
-              location: 'Hostal Brisa Marina',
-              description: 'Regreso al hospedaje para descansar antes del último día.',
-              status: ItineraryStatus.PENDING,
-              order: 5,
-            },
-          ],
-        },
+        itineraryItems: { create: valparaisoItinerary },
         announcements: {
           create: [
             {
@@ -339,7 +488,7 @@ async function main() {
 
     prisma.trip.create({
       data: {
-        name: '4° Medio A – Pucón y la Araucanía 2026',
+        name: puconName,
         destination: 'Pucón, Chile',
         schoolId: losAndes.id,
         startDate: new Date('2026-06-15'),
@@ -350,56 +499,14 @@ async function main() {
         studentCount: 30,
         initialLat: -39.2784,
         initialLng: -71.976,
+        programId: puconProgram.id,
         accessCodes: {
           create: [
             { code: 'PUC-2026', role: Role.PARENT },
             { code: 'MON-PUC', role: Role.MONITOR },
           ],
         },
-        itineraryItems: {
-          create: [
-            {
-              time: '08:00',
-              title: 'Desayuno',
-              location: 'Refugio Los Volcanes, Pucón',
-              description: 'Desayuno en el refugio antes de la actividad del día.',
-              status: ItineraryStatus.COMPLETED,
-              order: 1,
-            },
-            {
-              time: '09:30',
-              title: 'Trekking sector Los Pozones',
-              location: 'Los Pozones',
-              description: 'Caminata por sendero habilitado con guías de montaña.',
-              status: ItineraryStatus.COMPLETED,
-              order: 2,
-            },
-            {
-              time: '13:00',
-              title: 'Almuerzo',
-              location: 'Refugio Los Volcanes',
-              description: 'Almuerzo de recuperación tras el trekking.',
-              status: ItineraryStatus.COMPLETED,
-              order: 3,
-            },
-            {
-              time: '15:00',
-              title: 'Termas Geométricas',
-              location: 'Termas Geométricas',
-              description: 'Visita a las termas. Actividad pausada por la novedad reportada.',
-              status: ItineraryStatus.IN_PROGRESS,
-              order: 4,
-            },
-            {
-              time: '19:00',
-              title: 'Cena y reunión informativa',
-              location: 'Refugio Los Volcanes',
-              description: 'Cena y reunión con el equipo para informar a las familias.',
-              status: ItineraryStatus.PENDING,
-              order: 5,
-            },
-          ],
-        },
+        itineraryItems: { create: puconItinerary },
         announcements: {
           create: [
             {
@@ -437,7 +544,7 @@ async function main() {
 
     prisma.trip.create({
       data: {
-        name: '3° Medio B – Isla de Pascua 2026',
+        name: rapaNuiName,
         destination: 'Isla de Pascua, Chile',
         schoolId: sagradosCorazones.id,
         startDate: new Date('2026-06-10'),
@@ -448,56 +555,14 @@ async function main() {
         studentCount: 26,
         initialLat: -27.1127,
         initialLng: -109.3497,
+        programId: rapaNuiProgram.id,
         accessCodes: {
           create: [
             { code: 'RAP-2026', role: Role.PARENT },
             { code: 'MON-RAP', role: Role.MONITOR },
           ],
         },
-        itineraryItems: {
-          create: [
-            {
-              time: '08:00',
-              title: 'Desayuno',
-              location: 'Hotel Tupa, Hanga Roa',
-              description: 'Desayuno final antes del cierre de la gira.',
-              status: ItineraryStatus.COMPLETED,
-              order: 1,
-            },
-            {
-              time: '09:30',
-              title: 'Visita Ahu Tongariki',
-              location: 'Ahu Tongariki',
-              description: 'Visita al sitio arqueológico más grande de la isla.',
-              status: ItineraryStatus.COMPLETED,
-              order: 2,
-            },
-            {
-              time: '13:00',
-              title: 'Almuerzo',
-              location: 'Hotel Tupa',
-              description: 'Almuerzo de despedida con el grupo completo.',
-              status: ItineraryStatus.COMPLETED,
-              order: 3,
-            },
-            {
-              time: '15:00',
-              title: 'Cráter Rano Raraku',
-              location: 'Rano Raraku',
-              description: 'Visita a la cantera donde se esculpieron los moái.',
-              status: ItineraryStatus.COMPLETED,
-              order: 4,
-            },
-            {
-              time: '19:00',
-              title: 'Cena de despedida',
-              location: 'Hotel Tupa',
-              description: 'Cena de cierre con el grupo antes del vuelo de regreso.',
-              status: ItineraryStatus.COMPLETED,
-              order: 5,
-            },
-          ],
-        },
+        itineraryItems: { create: rapaNuiItinerary },
         announcements: {
           create: [
             {

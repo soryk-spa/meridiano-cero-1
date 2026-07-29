@@ -23,7 +23,6 @@ import { KNOWN_DESTINATIONS } from '@/lib/destinations'
 import { generateAccessCode } from '@/lib/generate-code'
 
 const CUSTOM_DESTINATION = 'custom'
-const NO_PROGRAM = 'none'
 
 type ProgramOption = { id: string; name: string }
 
@@ -46,7 +45,7 @@ export default function NewTripPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
-  const [programId, setProgramId] = useState(NO_PROGRAM)
+  const [programId, setProgramId] = useState('')
 
   useEffect(() => {
     fetch('/api/v1/admin/programs')
@@ -71,7 +70,7 @@ export default function NewTripPage() {
   }
 
   async function handleCreateTrip() {
-    if (!dateRange?.from || !dateRange?.to) return
+    if (!dateRange?.from || !dateRange?.to || !programId) return
     setSubmitting(true)
     setError(null)
     const res = await fetch('/api/v1/trips', {
@@ -84,7 +83,7 @@ export default function NewTripPage() {
         studentCount: Number(form.studentCount),
         initialLat: Number(form.initialLat),
         initialLng: Number(form.initialLng),
-        ...(programId !== NO_PROGRAM ? { programId } : {}),
+        programId,
       }),
     })
     setSubmitting(false)
@@ -104,7 +103,8 @@ export default function NewTripPage() {
     !!destinationId &&
     form.destination.trim() &&
     form.initialLat !== '' &&
-    form.initialLng !== ''
+    form.initialLng !== '' &&
+    !!programId
 
   return (
     <>
@@ -177,13 +177,12 @@ export default function NewTripPage() {
               ) : null}
 
               <div className="flex flex-col gap-2">
-                <Label>Programa (opcional)</Label>
-                <Select value={programId} onValueChange={setProgramId}>
+                <Label>Programa</Label>
+                <Select value={programId} onValueChange={setProgramId} disabled={programs.length === 0}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sin programa" />
+                    <SelectValue placeholder={programs.length ? 'Elegir un programa…' : 'No hay programas creados'} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_PROGRAM}>Sin programa</SelectItem>
                     {programs.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
@@ -191,11 +190,11 @@ export default function NewTripPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {programId !== NO_PROGRAM ? (
-                  <p className="text-xs text-muted-foreground">
-                    El itinerario se completa automáticamente con las actividades de este programa.
-                  </p>
-                ) : null}
+                <p className="text-xs text-muted-foreground">
+                  {programs.length
+                    ? 'El itinerario se completa automáticamente con las actividades de este programa.'
+                    : 'Primero crea un programa en /admin/programs.'}
+                </p>
               </div>
 
               <div className="flex flex-col gap-2 sm:col-span-2">

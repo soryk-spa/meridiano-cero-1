@@ -7,13 +7,16 @@ import {
   CalendarRangeIcon,
   CheckIcon,
   CopyIcon,
+  MessageSquareIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon,
   UserMinusIcon,
   UserPlusIcon,
+  UsersIcon,
 } from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
+import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import type {
   AccessCode,
@@ -27,6 +30,8 @@ import type {
 } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import StatusBadge from '@/components/StatusBadge'
+import { ActivityItemSheet, type ActivityItemEditing, type ActivityItemValues } from '@/components/activity-item-form'
+import { EmptyState } from '@/components/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,7 +55,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { itineraryStatusLabels, announcementTypeLabels, tripStatusLabels } from '@/lib/labels'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
@@ -65,14 +70,6 @@ const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'F
 const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
 
 const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '' }
-const EMPTY_ITINERARY_FORM = {
-  dayNumber: '1',
-  time: '',
-  title: '',
-  location: '',
-  description: '',
-  requirementsMessage: '',
-}
 const EMPTY_MONITOR_FORM = { firstName: '', lastName: '', emailAddress: '' }
 
 export default function AdminTripDetailPage() {
@@ -103,12 +100,8 @@ export default function AdminTripDetailPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [itineraryOpen, setItineraryOpen] = useState(false)
-  const [itineraryForm, setItineraryForm] = useState(EMPTY_ITINERARY_FORM)
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [savingItinerary, setSavingItinerary] = useState(false)
-  const [itineraryError, setItineraryError] = useState<string | null>(null)
+  const [editingItem, setEditingItem] = useState<ActivityItemEditing | null>(null)
   const [activityTemplates, setActivityTemplates] = useState<ActivityTemplate[]>([])
-  const [selectedActivityTemplateId, setSelectedActivityTemplateId] = useState<string | null>(null)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
   const [applyProgramOpen, setApplyProgramOpen] = useState(false)
   const [applyProgramId, setApplyProgramId] = useState<string | null>(null)
@@ -208,9 +201,12 @@ export default function AdminTripDetailPage() {
     if (res.ok) {
       setTrip((await res.json()).trip)
       setEditOpen(false)
+      toast.success('Gira actualizada.')
     } else {
       const data = await res.json().catch(() => null)
-      setEditError(data?.error?.message ?? 'No se pudo guardar la gira.')
+      const message = data?.error?.message ?? 'No se pudo guardar la gira.'
+      setEditError(message)
+      toast.error(message)
     }
   }
 
@@ -222,12 +218,24 @@ export default function AdminTripDetailPage() {
       body: JSON.stringify({ tripId, role }),
     })
     setAddingRole(null)
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Código generado.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo generar el código.')
+    }
   }
 
   async function handleRevokeCode(id: string) {
     const res = await fetch(`/api/v1/admin/codes/${id}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Código revocado.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo revocar el código.')
+    }
   }
 
   async function handleCopyCode(id: string, code: string) {
@@ -237,56 +245,24 @@ export default function AdminTripDetailPage() {
   }
 
   function openCreateItinerary() {
-    setEditingItemId(null)
-    setItineraryForm(EMPTY_ITINERARY_FORM)
-    setSelectedActivityTemplateId(null)
-    setItineraryError(null)
+    setEditingItem(null)
     setItineraryOpen(true)
   }
 
   function openEditItinerary(item: ItineraryItem) {
-    setEditingItemId(item.id)
-    setItineraryForm({
-      dayNumber: String(item.dayNumber),
+    setEditingItem({
+      id: item.id,
+      dayNumber: item.dayNumber,
       time: item.time,
       title: item.title,
       location: item.location,
       description: item.description,
-      requirementsMessage: item.requirementsMessage ?? '',
+      requirementsMessage: item.requirementsMessage,
     })
-    setSelectedActivityTemplateId(null)
-    setItineraryError(null)
     setItineraryOpen(true)
   }
 
-  function handleSelectActivityTemplate(id: string | null) {
-    setSelectedActivityTemplateId(id)
-    const template = activityTemplates.find((t) => t.id === id)
-    if (!template) return
-    setItineraryForm((p) => ({
-      ...p,
-      title: template.title,
-      location: template.defaultLocation ?? p.location,
-      description: template.description,
-      requirementsMessage: template.requirementsMessage ?? '',
-    }))
-  }
-
-  async function handleSaveItinerary() {
-    setSavingItinerary(true)
-    setItineraryError(null)
-    const body: Record<string, unknown> = {
-      dayNumber: Number(itineraryForm.dayNumber),
-      time: itineraryForm.time,
-      title: itineraryForm.title,
-      location: itineraryForm.location,
-      description: itineraryForm.description,
-    }
-    if (itineraryForm.requirementsMessage.trim()) {
-      body.requirementsMessage = itineraryForm.requirementsMessage.trim()
-    } else if (editingItemId) {
-      body.requirementsMessage = null
-    }
+  async function handleSaveItinerary(values: ActivityItemValues, editingItemId: string | null) {
     const res = await fetch(
       editingItemId
         ? `/api/v1/trips/${tripId}/itinerary/${editingItemId}`
@@ -294,23 +270,27 @@ export default function AdminTripDetailPage() {
       {
         method: editingItemId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(values),
       }
     )
-    setSavingItinerary(false)
     if (res.ok) {
-      setItineraryOpen(false)
       void load()
-    } else {
-      const data = await res.json().catch(() => null)
-      setItineraryError(data?.error?.message ?? 'No se pudo guardar el ítem.')
+      return { ok: true }
     }
+    const data = await res.json().catch(() => null)
+    return { ok: false, error: data?.error?.message ?? 'No se pudo guardar el ítem.' }
   }
 
   async function handleDeleteItinerary(itemId: string) {
     if (!window.confirm('¿Eliminar este ítem del itinerario?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/itinerary/${itemId}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Ítem eliminado.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo eliminar el ítem.')
+    }
   }
 
   function openApplyProgram() {
@@ -331,29 +311,50 @@ export default function AdminTripDetailPage() {
     setApplyingProgram(false)
     if (res.ok) {
       setApplyProgramOpen(false)
+      toast.success('Programa aplicado.')
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setApplyProgramError(data?.error?.message ?? 'No se pudo aplicar el programa.')
+      const message = data?.error?.message ?? 'No se pudo aplicar el programa.'
+      setApplyProgramError(message)
+      toast.error(message)
     }
   }
 
   async function handleDeleteAnnouncement(id: string) {
     if (!window.confirm('¿Eliminar este comunicado?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/announcements/${id}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Comunicado eliminado.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo eliminar el comunicado.')
+    }
   }
 
   async function handleRemoveParent(membershipId: string) {
     if (!window.confirm('¿Quitar a este apoderado de la gira?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Apoderado quitado de la gira.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo quitar al apoderado.')
+    }
   }
 
   async function handleRemoveMonitor(membershipId: string) {
     if (!window.confirm('¿Quitar a este monitor de la gira?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Monitor quitado de la gira.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo quitar al monitor.')
+    }
   }
 
   function openAddMonitor() {
@@ -376,10 +377,13 @@ export default function AdminTripDetailPage() {
     if (res.ok) {
       const data = await res.json()
       setCreatedCredentials({ email: data.email, password: data.password })
+      toast.success('Monitor agregado.')
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setAddMonitorError(data?.error?.message ?? 'No se pudo agregar al monitor.')
+      const message = data?.error?.message ?? 'No se pudo agregar al monitor.'
+      setAddMonitorError(message)
+      toast.error(message)
     }
   }
 
@@ -474,6 +478,15 @@ export default function AdminTripDetailPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+        <Tabs defaultValue="resumen">
+          <TabsList>
+            <TabsTrigger value="resumen">Resumen</TabsTrigger>
+            <TabsTrigger value="itinerario">Itinerario</TabsTrigger>
+            <TabsTrigger value="comunicados">Comunicados</TabsTrigger>
+            <TabsTrigger value="personas">Personas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="resumen" className="mt-4 flex flex-col gap-4">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card>
             <CardHeader>
@@ -533,8 +546,9 @@ export default function AdminTripDetailPage() {
             </CardContent>
           )}
         </Card>
+          </TabsContent>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <TabsContent value="itinerario" className="mt-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Itinerario</CardTitle>
@@ -576,115 +590,10 @@ export default function AdminTripDetailPage() {
                     </DialogFooter>
                   </DialogContent>
                 </Dialog>
-                <Dialog open={itineraryOpen} onOpenChange={setItineraryOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" onClick={openCreateItinerary}>
-                      <PlusIcon />
-                      Agregar
-                    </Button>
-                  </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>{editingItemId ? 'Editar ítem' : 'Nuevo ítem de itinerario'}</DialogTitle>
-                  </DialogHeader>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-2">
-                      <Label>Actividad de la biblioteca (opcional)</Label>
-                      <Combobox
-                        options={activityTemplates.map((t) => ({
-                          value: t.id,
-                          label: t.title,
-                          description: t.defaultLocation ?? undefined,
-                        }))}
-                        value={selectedActivityTemplateId}
-                        onSelect={handleSelectActivityTemplate}
-                        placeholder="Elegir de la biblioteca…"
-                        emptyLabel="Sin actividades en la biblioteca."
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="itinerary-day">Día</Label>
-                        <Select
-                          value={itineraryForm.dayNumber}
-                          onValueChange={(value) => setItineraryForm((p) => ({ ...p, dayNumber: value }))}
-                        >
-                          <SelectTrigger id="itinerary-day">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from({ length: trip.totalDays }, (_, i) => i + 1).map((day) => (
-                              <SelectItem key={day} value={String(day)}>
-                                Día {day}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="itinerary-time">Hora</Label>
-                        <Input
-                          id="itinerary-time"
-                          placeholder="09:00"
-                          value={itineraryForm.time}
-                          onChange={(e) => setItineraryForm((p) => ({ ...p, time: e.target.value }))}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Label htmlFor="itinerary-title">Título</Label>
-                        <Input
-                          id="itinerary-title"
-                          value={itineraryForm.title}
-                          onChange={(e) => setItineraryForm((p) => ({ ...p, title: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="itinerary-location">Lugar</Label>
-                      <Input
-                        id="itinerary-location"
-                        value={itineraryForm.location}
-                        onChange={(e) => setItineraryForm((p) => ({ ...p, location: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="itinerary-description">Descripción</Label>
-                      <Textarea
-                        id="itinerary-description"
-                        value={itineraryForm.description}
-                        onChange={(e) => setItineraryForm((p) => ({ ...p, description: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="itinerary-requirements">Requisitos para apoderados (opcional)</Label>
-                      <Textarea
-                        id="itinerary-requirements"
-                        placeholder="Ej: traer ropa de abrigo y llegar 15 min antes."
-                        value={itineraryForm.requirementsMessage}
-                        onChange={(e) => setItineraryForm((p) => ({ ...p, requirementsMessage: e.target.value }))}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        El monitor podrá enviarlo como comunicado con un toque desde la app.
-                      </p>
-                    </div>
-                    {itineraryError ? <p className="text-sm text-destructive">{itineraryError}</p> : null}
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      onClick={handleSaveItinerary}
-                      disabled={
-                        savingItinerary ||
-                        !itineraryForm.time.trim() ||
-                        !itineraryForm.title.trim() ||
-                        !itineraryForm.location.trim() ||
-                        !itineraryForm.description.trim()
-                      }
-                    >
-                      {savingItinerary ? 'Guardando…' : 'Guardar'}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                <Button variant="outline" size="sm" onClick={openCreateItinerary}>
+                  <PlusIcon />
+                  Agregar
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -742,11 +651,17 @@ export default function AdminTripDetailPage() {
                     </div>
                   ))
               ) : (
-                <p className="text-sm text-muted-foreground">Sin ítems de itinerario.</p>
+                <EmptyState
+                  icon={CalendarRangeIcon}
+                  title="Sin ítems de itinerario."
+                  description="Agrega actividades a mano o aplica un programa."
+                />
               )}
             </CardContent>
           </Card>
+          </TabsContent>
 
+          <TabsContent value="comunicados" className="mt-4">
           <Card>
             <CardHeader>
               <CardTitle>Comunicados</CardTitle>
@@ -775,12 +690,17 @@ export default function AdminTripDetailPage() {
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-muted-foreground">Sin comunicados.</p>
+                <EmptyState
+                  icon={MessageSquareIcon}
+                  title="Sin comunicados."
+                  description="Los comunicados se publican automáticamente al avanzar una actividad."
+                />
               )}
             </CardContent>
           </Card>
-        </div>
+          </TabsContent>
 
+          <TabsContent value="personas" className="mt-4 flex flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>Apoderados ({parents.length})</CardTitle>
@@ -800,7 +720,11 @@ export default function AdminTripDetailPage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">Sin apoderados registrados todavía.</p>
+              <EmptyState
+                icon={UsersIcon}
+                title="Sin apoderados registrados todavía."
+                description="Se suman automáticamente al usar el código de acceso de apoderado."
+              />
             )}
           </CardContent>
         </Card>
@@ -917,7 +841,11 @@ export default function AdminTripDetailPage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">Sin monitores asignados todavía.</p>
+              <EmptyState
+                icon={UsersIcon}
+                title="Sin monitores asignados todavía."
+                description="Agrega un monitor para que pueda gestionar esta gira desde la app."
+              />
             )}
           </CardContent>
         </Card>
@@ -971,7 +899,17 @@ export default function AdminTripDetailPage() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+        </Tabs>
       </div>
+      <ActivityItemSheet
+        open={itineraryOpen}
+        onOpenChange={setItineraryOpen}
+        totalDays={trip.totalDays}
+        activityTemplates={activityTemplates}
+        editingItem={editingItem}
+        onSubmit={handleSaveItinerary}
+      />
     </>
   )
 }

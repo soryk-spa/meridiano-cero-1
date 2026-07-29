@@ -24,12 +24,17 @@ import {
   ListPlusIcon,
   MoreVerticalIcon,
   PencilIcon,
+  RouteIcon,
+  SearchIcon,
   Trash2Icon,
 } from "lucide-react"
+import { toast } from "sonner"
 import type { AccessCode, Trip } from "@prisma/client"
 
 import StatusBadge from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/empty-state"
+import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -70,7 +75,13 @@ function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripN
     setDeleting(true)
     const res = await fetch(`/api/v1/trips/${tripId}`, { method: "DELETE" })
     setDeleting(false)
-    if (res.ok) onDeleted()
+    if (res.ok) {
+      toast.success("Gira eliminada.")
+      onDeleted()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? "No se pudo eliminar la gira.")
+    }
   }
 
   return (
@@ -179,10 +190,30 @@ export function DataTable({
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 })
+  const [search, setSearch] = React.useState("")
+  const [schoolFilter, setSchoolFilter] = React.useState("all")
+  const [statusFilter, setStatusFilter] = React.useState<"all" | "active">("all")
   const columns = React.useMemo(() => buildColumns(onTripDeleted ?? (() => {})), [onTripDeleted])
 
+  const schoolOptions = React.useMemo(
+    () => Array.from(new Set(data.map((trip) => trip.school.name))).sort(),
+    [data]
+  )
+
+  const filteredData = React.useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return data.filter((trip) => {
+      if (statusFilter === "active" && trip.status === "FINISHED") return false
+      if (schoolFilter !== "all" && trip.school.name !== schoolFilter) return false
+      if (query && !trip.name.toLowerCase().includes(query) && !trip.destination.toLowerCase().includes(query)) {
+        return false
+      }
+      return true
+    })
+  }, [data, search, schoolFilter, statusFilter])
+
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     state: { sorting, columnVisibility, pagination },
     onSortingChange: setSorting,
@@ -197,17 +228,21 @@ export function DataTable({
     <div className="flex w-full flex-col justify-start gap-4 px-4 lg:px-6">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1">
-          {[
-            ["Operación", null],
-            ["En terreno", data.filter((trip) => trip.status !== "FINISHED").length],
-            ["Códigos", data.reduce((sum, trip) => sum + trip.accessCodes.length, 0)],
-            ["Colegios", new Set(data.map((trip) => trip.school.name)).size],
-          ].map(([label, count], index) => (
+          {(
+            [
+              ["Operación", "all", null],
+              ["En terreno", "active", data.filter((trip) => trip.status !== "FINISHED").length],
+              ["Códigos", null, data.reduce((sum, trip) => sum + trip.accessCodes.length, 0)],
+              ["Colegios", null, new Set(data.map((trip) => trip.school.name)).size],
+            ] as const
+          ).map(([label, filterValue, count]) => (
             <Button
               key={label}
-              variant={index === 0 ? "secondary" : "ghost"}
+              variant={filterValue !== null && statusFilter === filterValue ? "secondary" : "ghost"}
               size="sm"
               className="h-8 rounded-md"
+              onClick={filterValue !== null ? () => setStatusFilter(filterValue) : undefined}
+              disabled={filterValue === null}
             >
               {label}
               {typeof count === "number" ? (
@@ -252,6 +287,31 @@ export function DataTable({
         </div>
       </div>
 
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="relative flex-1 sm:max-w-xs">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nombre o destino…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8"
+          />
+        </div>
+        <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+          <SelectTrigger className="w-full sm:w-56">
+            <SelectValue placeholder="Todos los colegios" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos los colegios</SelectItem>
+            {schoolOptions.map((school) => (
+              <SelectItem key={school} value={school}>
+                {school}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader className="bg-muted/80">
@@ -276,8 +336,14 @@ export function DataTable({
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Sin giras todavía.
+                <TableCell colSpan={columns.length}>
+                  <EmptyState
+                    icon={RouteIcon}
+                    title={data.length ? "Sin resultados para estos filtros." : "Sin giras todavía."}
+                    description={
+                      data.length ? "Prueba con otra búsqueda o colegio." : "Crea la primera gira para empezar."
+                    }
+                  />
                 </TableCell>
               </TableRow>
             )}

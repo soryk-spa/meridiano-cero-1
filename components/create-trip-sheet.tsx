@@ -30,7 +30,6 @@ import { KNOWN_DESTINATIONS } from "@/lib/destinations"
 import { generateAccessCode } from "@/lib/generate-code"
 
 const CUSTOM_DESTINATION = "custom"
-const NO_PROGRAM = "none"
 
 type ProgramOption = { id: string; name: string }
 
@@ -52,7 +51,7 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [submitting, setSubmitting] = useState(false)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
-  const [programId, setProgramId] = useState(NO_PROGRAM)
+  const [programId, setProgramId] = useState("")
 
   useEffect(() => {
     fetch("/api/v1/admin/programs")
@@ -80,11 +79,11 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
     setForm(EMPTY_FORM)
     setDestinationId("")
     setDateRange(undefined)
-    setProgramId(NO_PROGRAM)
+    setProgramId("")
   }
 
   async function handleCreateTrip() {
-    if (!dateRange?.from || !dateRange?.to) return
+    if (!dateRange?.from || !dateRange?.to || !programId) return
     setSubmitting(true)
     const res = await fetch("/api/v1/trips", {
       method: "POST",
@@ -96,7 +95,7 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
         studentCount: Number(form.studentCount),
         initialLat: Number(form.initialLat),
         initialLng: Number(form.initialLng),
-        ...(programId !== NO_PROGRAM ? { programId } : {}),
+        programId,
       }),
     })
     setSubmitting(false)
@@ -114,7 +113,8 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
     !!destinationId &&
     form.destination.trim() &&
     form.initialLat !== "" &&
-    form.initialLng !== ""
+    form.initialLng !== "" &&
+    !!programId
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -182,13 +182,12 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
             ) : null}
 
             <div className="flex flex-col gap-2">
-              <Label>Programa (opcional)</Label>
-              <Select value={programId} onValueChange={setProgramId}>
+              <Label>Programa</Label>
+              <Select value={programId} onValueChange={setProgramId} disabled={programs.length === 0}>
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Sin programa" />
+                  <SelectValue placeholder={programs.length ? "Elegir un programa…" : "No hay programas creados"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_PROGRAM}>Sin programa</SelectItem>
                   {programs.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
@@ -196,11 +195,11 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
                   ))}
                 </SelectContent>
               </Select>
-              {programId !== NO_PROGRAM ? (
-                <p className="text-xs text-muted-foreground">
-                  El itinerario se completa automáticamente con las actividades de este programa.
-                </p>
-              ) : null}
+              <p className="text-xs text-muted-foreground">
+                {programs.length
+                  ? "El itinerario se completa automáticamente con las actividades de este programa."
+                  : "Primero crea un programa en /admin/programs."}
+              </p>
             </div>
 
             <div className="flex flex-col gap-2">

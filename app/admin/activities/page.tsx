@@ -1,11 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ClipboardListIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ActivityTemplate } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +18,9 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
 
 const EMPTY_FORM = { title: '', defaultLocation: '', description: '', requirementsMessage: '' }
@@ -30,6 +33,7 @@ export default function AdminActivitiesPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -87,19 +91,38 @@ export default function AdminActivitiesPage() {
     )
     setSaving(false)
     if (res.ok) {
+      toast.success(editingId ? 'Actividad actualizada.' : 'Actividad creada.')
       setOpen(false)
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setError(data?.error?.message ?? 'No se pudo guardar la actividad.')
+      const message = data?.error?.message ?? 'No se pudo guardar la actividad.'
+      setError(message)
+      toast.error(message)
     }
   }
 
   async function handleDelete(id: string) {
     if (!window.confirm('¿Eliminar esta actividad de la biblioteca?')) return
     const res = await fetch(`/api/v1/admin/activity-templates/${id}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Actividad eliminada.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo eliminar la actividad.')
+    }
   }
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return (activities ?? []).filter(
+      (activity) =>
+        !query ||
+        activity.title.toLowerCase().includes(query) ||
+        (activity.defaultLocation ?? '').toLowerCase().includes(query)
+    )
+  }, [activities, search])
 
   return (
     <>
@@ -169,43 +192,70 @@ export default function AdminActivitiesPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-          {loadError && !activities ? (
-            <div className="col-span-full">
-              <FetchError message={loadError} onRetry={load} />
+        {loadError && !activities ? (
+          <FetchError message={loadError} onRetry={load} />
+        ) : !activities ? (
+          <Skeleton className="h-64 w-full" />
+        ) : (
+          <>
+            <div className="relative max-w-xs">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por título o lugar…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
             </div>
-          ) : !activities ? (
-            Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 w-full" />)
-          ) : activities.length ? (
-            activities.map((activity) => (
-              <Card key={activity.id}>
-                <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-                  <div>
-                    <CardTitle className="text-base">{activity.title}</CardTitle>
-                    {activity.defaultLocation ? (
-                      <p className="mt-1 text-xs text-muted-foreground">{activity.defaultLocation}</p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(activity)}>
-                      <PencilIcon className="size-4" />
-                      <span className="sr-only">Editar</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(activity.id)}>
-                      <Trash2Icon className="size-4" />
-                      <span className="sr-only">Eliminar</span>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{activity.description}</p>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin actividades en la biblioteca todavía.</p>
-          )}
-        </div>
+            <Card className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Lugar por defecto</TableHead>
+                    <TableHead>Descripción</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length ? (
+                    filtered.map((activity) => (
+                      <TableRow key={activity.id} className="h-16">
+                        <TableCell className="font-medium">{activity.title}</TableCell>
+                        <TableCell className="text-muted-foreground">{activity.defaultLocation ?? '—'}</TableCell>
+                        <TableCell className="max-w-xs truncate text-muted-foreground">
+                          {activity.description}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(activity)}>
+                              <PencilIcon className="size-4" />
+                              <span className="sr-only">Editar</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(activity.id)}>
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4}>
+                        <EmptyState
+                          icon={ClipboardListIcon}
+                          title={activities.length ? 'Sin resultados para esta búsqueda.' : 'Sin actividades en la biblioteca todavía.'}
+                          description={activities.length ? 'Prueba con otro título o lugar.' : 'Crea la primera actividad reutilizable.'}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </>
+        )}
       </div>
     </>
   )

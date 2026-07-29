@@ -1,10 +1,11 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { PlusIcon, SchoolIcon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { PlusIcon, SchoolIcon, SearchIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { SiteHeader } from '@/components/site-header'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
 
 type SchoolRow = {
@@ -33,6 +36,7 @@ export default function AdminSchoolsPage() {
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -63,14 +67,22 @@ export default function AdminSchoolsPage() {
     })
     setCreating(false)
     if (res.ok) {
+      toast.success('Colegio creado.')
       setName('')
       setOpen(false)
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setError(data?.error?.message ?? 'No se pudo crear el colegio.')
+      const message = data?.error?.message ?? 'No se pudo crear el colegio.'
+      setError(message)
+      toast.error(message)
     }
   }
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return (schools ?? []).filter((school) => !query || school.name.toLowerCase().includes(query))
+  }, [schools, search])
 
   return (
     <>
@@ -104,42 +116,62 @@ export default function AdminSchoolsPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-          {loadError && !schools ? (
-            <div className="col-span-full">
-              <FetchError message={loadError} onRetry={load} />
+        {loadError && !schools ? (
+          <FetchError message={loadError} onRetry={load} />
+        ) : !schools ? (
+          <Skeleton className="h-64 w-full" />
+        ) : (
+          <>
+            <div className="relative max-w-xs">
+              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
             </div>
-          ) : !schools ? (
-            Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 w-full" />)
-          ) : schools.length ? (
-            schools.map((school) => (
-              <Card key={school.id}>
-                <CardHeader className="flex flex-row items-center gap-3 space-y-0">
-                  <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
-                    <SchoolIcon size={17} />
-                  </div>
-                  <CardTitle className="text-base">{school.name}</CardTitle>
-                </CardHeader>
-                <CardContent className="flex justify-between text-sm">
-                  <div>
-                    <p className="font-semibold">{school.tripCount}</p>
-                    <p className="text-muted-foreground">Giras totales</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold">{school.activeTripCount}</p>
-                    <p className="text-muted-foreground">En terreno</p>
-                  </div>
-                  <div>
-                    <p className="font-semibold">{school.studentCount}</p>
-                    <p className="text-muted-foreground">Alumnos</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin colegios registrados.</p>
-          )}
-        </div>
+            <Card className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Giras totales</TableHead>
+                    <TableHead>En terreno</TableHead>
+                    <TableHead>Alumnos</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length ? (
+                    filtered.map((school) => (
+                      <TableRow key={school.id} className="h-16">
+                        <TableCell className="flex items-center gap-3 font-medium">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+                            <SchoolIcon size={15} />
+                          </div>
+                          {school.name}
+                        </TableCell>
+                        <TableCell>{school.tripCount}</TableCell>
+                        <TableCell>{school.activeTripCount}</TableCell>
+                        <TableCell>{school.studentCount}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={4}>
+                        <EmptyState
+                          icon={SchoolIcon}
+                          title={schools.length ? 'Sin resultados para esta búsqueda.' : 'Sin colegios registrados.'}
+                          description={schools.length ? 'Prueba con otro nombre.' : 'Crea el primer colegio para empezar.'}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </>
+        )}
       </div>
     </>
   )

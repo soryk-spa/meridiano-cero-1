@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { DownloadIcon } from 'lucide-react'
+import { DownloadIcon, FileTextIcon } from 'lucide-react'
 import type { Announcement, AnnouncementType } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
 import { announcementTypeLabels } from '@/lib/labels'
 import type { TripRow } from '@/components/data-table'
@@ -54,6 +55,7 @@ export default function AdminReportsPage() {
   const [reports, setReports] = useState<ReportRow[] | null>(null)
   const [trips, setTrips] = useState<TripRow[]>([])
   const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'ALL'>('ALL')
+  const [schoolFilter, setSchoolFilter] = useState('ALL')
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -79,9 +81,19 @@ export default function AdminReportsPage() {
     return () => window.clearTimeout(id)
   }, [load])
 
+  const schoolOptions = useMemo(
+    () => Array.from(new Set(trips.map((trip) => trip.school.name))).sort(),
+    [trips]
+  )
+
   const filtered = useMemo(
-    () => (reports ?? []).filter((report) => typeFilter === 'ALL' || report.type === typeFilter),
-    [reports, typeFilter]
+    () =>
+      (reports ?? []).filter(
+        (report) =>
+          (typeFilter === 'ALL' || report.type === typeFilter) &&
+          (schoolFilter === 'ALL' || report.trip.school.name === schoolFilter)
+      ),
+    [reports, typeFilter, schoolFilter]
   )
 
   return (
@@ -106,6 +118,19 @@ export default function AdminReportsPage() {
               <SelectItem value="ALL">Todos los tipos</SelectItem>
               <SelectItem value="ALERT">Alertas</SelectItem>
               <SelectItem value="ACHIEVEMENT">Logros</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="Todos los colegios" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos los colegios</SelectItem>
+              {schoolOptions.map((school) => (
+                <SelectItem key={school} value={school}>
+                  {school}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -149,8 +174,12 @@ export default function AdminReportsPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                      Sin reportes para este filtro.
+                    <TableCell colSpan={5}>
+                      <EmptyState
+                        icon={FileTextIcon}
+                        title="Sin reportes para este filtro."
+                        description="Prueba con otro tipo o colegio."
+                      />
                     </TableCell>
                   </TableRow>
                 )}

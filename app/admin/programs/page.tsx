@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { CalendarRangeIcon, PlusIcon } from 'lucide-react'
+import { CalendarRangeIcon, MoreVerticalIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 import { SiteHeader } from '@/components/site-header'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -14,10 +15,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
 
 type ProgramRow = {
@@ -65,13 +74,30 @@ export default function AdminProgramsPage() {
     })
     setCreating(false)
     if (res.ok) {
+      toast.success('Programa creado.')
       setName('')
       setDescription('')
       setOpen(false)
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setError(data?.error?.message ?? 'No se pudo crear el programa.')
+      const message = data?.error?.message ?? 'No se pudo crear el programa.'
+      setError(message)
+      toast.error(message)
+    }
+  }
+
+  async function handleDelete(program: ProgramRow) {
+    if (!window.confirm(`¿Eliminar el programa "${program.name}"? Las giras que ya lo aplicaron no se ven afectadas.`)) {
+      return
+    }
+    const res = await fetch(`/api/v1/admin/programs/${program.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Programa eliminado.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo eliminar el programa.')
     }
   }
 
@@ -122,40 +148,75 @@ export default function AdminProgramsPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-          {loadError && !programs ? (
-            <div className="col-span-full">
-              <FetchError message={loadError} onRetry={load} />
-            </div>
-          ) : !programs ? (
-            Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 w-full" />)
-          ) : programs.length ? (
-            programs.map((program) => (
-              <Link key={program.id} href={`/admin/programs/${program.id}`}>
-                <Card className="h-full transition-colors hover:bg-muted/40">
-                  <CardHeader className="flex flex-row items-center gap-3 space-y-0">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
-                      <CalendarRangeIcon size={17} />
-                    </div>
-                    <CardTitle className="text-base">{program.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex justify-between text-sm">
-                    <div>
-                      <p className="font-semibold">{program.itemCount}</p>
-                      <p className="text-muted-foreground">Actividades</p>
-                    </div>
-                    <div>
-                      <p className="font-semibold">{program.tripCount}</p>
-                      <p className="text-muted-foreground">Giras asignadas</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin programas todavía.</p>
-          )}
-        </div>
+        {loadError && !programs ? (
+          <FetchError message={loadError} onRetry={load} />
+        ) : !programs ? (
+          <Skeleton className="h-64 w-full" />
+        ) : (
+          <Card className="overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead>Actividades</TableHead>
+                  <TableHead>Giras asignadas</TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {programs.length ? (
+                  programs.map((program) => (
+                    <TableRow key={program.id} className="h-16">
+                      <TableCell>
+                        <Link href={`/admin/programs/${program.id}`} className="flex items-center gap-3 font-medium hover:underline">
+                          <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-secondary-foreground">
+                            <CalendarRangeIcon size={15} />
+                          </div>
+                          {program.name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="max-w-xs truncate text-muted-foreground">
+                        {program.description ?? '—'}
+                      </TableCell>
+                      <TableCell>{program.itemCount}</TableCell>
+                      <TableCell>{program.tripCount}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground">
+                              <MoreVerticalIcon />
+                              <span className="sr-only">Abrir menú</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-44">
+                            <DropdownMenuItem
+                              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                              onSelect={() => handleDelete(program)}
+                            >
+                              <Trash2Icon className="size-4" />
+                              Eliminar programa
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5}>
+                      <EmptyState
+                        icon={CalendarRangeIcon}
+                        title="Sin programas todavía."
+                        description="Crea un programa reutilizable para poblar el itinerario de una gira automáticamente."
+                      />
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
       </div>
     </>
   )

@@ -1,12 +1,13 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { MessageSquareIcon, PencilIcon, PlusIcon, SearchIcon, Trash2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 import type { AnnouncementTemplate, AnnouncementType } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
 import { announcementTypeLabels } from '@/lib/labels'
 
@@ -39,6 +42,8 @@ export default function AdminMessagesPage() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'ALL'>('ALL')
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -96,19 +101,37 @@ export default function AdminMessagesPage() {
     )
     setSaving(false)
     if (res.ok) {
+      toast.success(editingId ? 'Mensaje actualizado.' : 'Mensaje creado.')
       setOpen(false)
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setError(data?.error?.message ?? 'No se pudo guardar el mensaje.')
+      const message = data?.error?.message ?? 'No se pudo guardar el mensaje.'
+      setError(message)
+      toast.error(message)
     }
   }
 
   async function handleDelete(id: string) {
     if (!window.confirm('¿Eliminar esta plantilla de mensaje?')) return
     const res = await fetch(`/api/v1/announcement-templates/${id}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Mensaje eliminado.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo eliminar el mensaje.')
+    }
   }
+
+  const filtered = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return (templates ?? []).filter(
+      (template) =>
+        (typeFilter === 'ALL' || template.type === typeFilter) &&
+        (!query || template.title.toLowerCase().includes(query) || template.message.toLowerCase().includes(query))
+    )
+  }, [templates, search, typeFilter])
 
   return (
     <>
@@ -185,46 +208,87 @@ export default function AdminMessagesPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
-          {loadError && !templates ? (
-            <div className="col-span-full">
-              <FetchError message={loadError} onRetry={load} />
+        {loadError && !templates ? (
+          <FetchError message={loadError} onRetry={load} />
+        ) : !templates ? (
+          <Skeleton className="h-64 w-full" />
+        ) : (
+          <>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative flex-1 sm:max-w-xs">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por título o mensaje…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as AnnouncementType | 'ALL')}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">Todos los tipos</SelectItem>
+                  {(Object.keys(announcementTypeLabels) as AnnouncementType[]).map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {announcementTypeLabels[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ) : !templates ? (
-            Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="h-32 w-full" />)
-          ) : templates.length ? (
-            templates.map((template) => (
-              <Card key={template.id}>
-                <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
-                  <div>
-                    <CardTitle className="text-base">{template.title}</CardTitle>
-                    <div className="mt-1 flex items-center gap-2">
-                      <Badge variant="outline">{announcementTypeLabels[template.type]}</Badge>
-                      {template.category ? (
-                        <span className="text-xs text-muted-foreground">{template.category}</span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <Button variant="ghost" size="icon" onClick={() => openEdit(template)}>
-                      <PencilIcon className="size-4" />
-                      <span className="sr-only">Editar</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(template.id)}>
-                      <Trash2Icon className="size-4" />
-                      <span className="sr-only">Eliminar</span>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{template.message}</p>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <p className="text-sm text-muted-foreground">Sin mensajes predeterminados todavía.</p>
-          )}
-        </div>
+            <Card className="overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead>Mensaje</TableHead>
+                    <TableHead className="w-20" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.length ? (
+                    filtered.map((template) => (
+                      <TableRow key={template.id} className="h-16">
+                        <TableCell className="font-medium">{template.title}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{announcementTypeLabels[template.type]}</Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{template.category ?? '—'}</TableCell>
+                        <TableCell className="max-w-xs truncate text-muted-foreground">{template.message}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEdit(template)}>
+                              <PencilIcon className="size-4" />
+                              <span className="sr-only">Editar</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(template.id)}>
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Eliminar</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5}>
+                        <EmptyState
+                          icon={MessageSquareIcon}
+                          title={templates.length ? 'Sin resultados para estos filtros.' : 'Sin mensajes predeterminados todavía.'}
+                          description={templates.length ? 'Prueba con otra búsqueda o tipo.' : 'Crea la primera plantilla de mensaje.'}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </Card>
+          </>
+        )}
       </div>
     </>
   )

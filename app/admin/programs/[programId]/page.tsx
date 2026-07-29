@@ -2,24 +2,25 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
-import { PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { CalendarRangeIcon, PencilIcon, PlusIcon, Trash2Icon } from 'lucide-react'
+import { toast } from 'sonner'
 import type { ActivityTemplate, ProgramItem } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
+import { ActivityItemSheet, type ActivityItemEditing, type ActivityItemValues } from '@/components/activity-item-form'
+import {
+  Timeline,
+  TimelineContent,
+  TimelineDate,
+  TimelineHeader,
+  TimelineIndicator,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineTitle,
+} from '@/components/reui/timeline'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Combobox } from '@/components/ui/combobox'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/empty-state'
 
 type ProgramDetail = {
   id: string
@@ -28,25 +29,12 @@ type ProgramDetail = {
   items: ProgramItem[]
 }
 
-const EMPTY_ITEM_FORM = {
-  dayNumber: '1',
-  time: '',
-  title: '',
-  location: '',
-  description: '',
-  requirementsMessage: '',
-}
-
 export default function AdminProgramDetailPage() {
   const { programId } = useParams<{ programId: string }>()
   const [program, setProgram] = useState<ProgramDetail | null>(null)
   const [activityTemplates, setActivityTemplates] = useState<ActivityTemplate[]>([])
   const [itemOpen, setItemOpen] = useState(false)
-  const [itemForm, setItemForm] = useState(EMPTY_ITEM_FORM)
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [selectedActivityTemplateId, setSelectedActivityTemplateId] = useState<string | null>(null)
-  const [savingItem, setSavingItem] = useState(false)
-  const [itemError, setItemError] = useState<string | null>(null)
+  const [editingItem, setEditingItem] = useState<ActivityItemEditing | null>(null)
 
   const load = useCallback(async () => {
     const [programRes, activityTemplatesRes] = await Promise.all([
@@ -65,56 +53,24 @@ export default function AdminProgramDetailPage() {
   }, [load])
 
   function openCreateItem() {
-    setEditingItemId(null)
-    setItemForm(EMPTY_ITEM_FORM)
-    setSelectedActivityTemplateId(null)
-    setItemError(null)
+    setEditingItem(null)
     setItemOpen(true)
   }
 
   function openEditItem(item: ProgramItem) {
-    setEditingItemId(item.id)
-    setItemForm({
-      dayNumber: String(item.dayNumber),
+    setEditingItem({
+      id: item.id,
+      dayNumber: item.dayNumber,
       time: item.time,
       title: item.title,
       location: item.location,
       description: item.description,
-      requirementsMessage: item.requirementsMessage ?? '',
+      requirementsMessage: item.requirementsMessage,
     })
-    setSelectedActivityTemplateId(null)
-    setItemError(null)
     setItemOpen(true)
   }
 
-  function handleSelectActivityTemplate(id: string | null) {
-    setSelectedActivityTemplateId(id)
-    const template = activityTemplates.find((t) => t.id === id)
-    if (!template) return
-    setItemForm((p) => ({
-      ...p,
-      title: template.title,
-      location: template.defaultLocation ?? p.location,
-      description: template.description,
-      requirementsMessage: template.requirementsMessage ?? '',
-    }))
-  }
-
-  async function handleSaveItem() {
-    setSavingItem(true)
-    setItemError(null)
-    const body: Record<string, unknown> = {
-      dayNumber: Number(itemForm.dayNumber),
-      time: itemForm.time,
-      title: itemForm.title,
-      location: itemForm.location,
-      description: itemForm.description,
-    }
-    if (itemForm.requirementsMessage.trim()) {
-      body.requirementsMessage = itemForm.requirementsMessage.trim()
-    } else if (editingItemId) {
-      body.requirementsMessage = null
-    }
+  async function handleSaveItem(values: ActivityItemValues, editingItemId: string | null) {
     const res = await fetch(
       editingItemId
         ? `/api/v1/admin/programs/${programId}/items/${editingItemId}`
@@ -122,23 +78,27 @@ export default function AdminProgramDetailPage() {
       {
         method: editingItemId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(values),
       }
     )
-    setSavingItem(false)
     if (res.ok) {
-      setItemOpen(false)
       void load()
-    } else {
-      const data = await res.json().catch(() => null)
-      setItemError(data?.error?.message ?? 'No se pudo guardar la actividad.')
+      return { ok: true }
     }
+    const data = await res.json().catch(() => null)
+    return { ok: false, error: data?.error?.message ?? 'No se pudo guardar la actividad.' }
   }
 
   async function handleDeleteItem(itemId: string) {
     if (!window.confirm('¿Eliminar esta actividad del programa?')) return
     const res = await fetch(`/api/v1/admin/programs/${programId}/items/${itemId}`, { method: 'DELETE' })
-    if (res.ok) void load()
+    if (res.ok) {
+      toast.success('Actividad eliminada.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo eliminar la actividad.')
+    }
   }
 
   if (!program) {
@@ -167,144 +127,68 @@ export default function AdminProgramDetailPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Actividades del programa</CardTitle>
-            <Dialog open={itemOpen} onOpenChange={setItemOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" onClick={openCreateItem}>
-                  <PlusIcon />
-                  Agregar
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{editingItemId ? 'Editar actividad' : 'Nueva actividad del programa'}</DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-2">
-                    <Label>Actividad de la biblioteca (opcional)</Label>
-                    <Combobox
-                      options={activityTemplates.map((t) => ({
-                        value: t.id,
-                        label: t.title,
-                        description: t.defaultLocation ?? undefined,
-                      }))}
-                      value={selectedActivityTemplateId}
-                      onSelect={handleSelectActivityTemplate}
-                      placeholder="Elegir de la biblioteca…"
-                      emptyLabel="Sin actividades en la biblioteca."
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="program-item-day">Día</Label>
-                      <Input
-                        id="program-item-day"
-                        type="number"
-                        min={1}
-                        value={itemForm.dayNumber}
-                        onChange={(e) => setItemForm((p) => ({ ...p, dayNumber: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="program-item-time">Hora</Label>
-                      <Input
-                        id="program-item-time"
-                        placeholder="09:00"
-                        value={itemForm.time}
-                        onChange={(e) => setItemForm((p) => ({ ...p, time: e.target.value }))}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="program-item-title">Título</Label>
-                      <Input
-                        id="program-item-title"
-                        value={itemForm.title}
-                        onChange={(e) => setItemForm((p) => ({ ...p, title: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="program-item-location">Lugar</Label>
-                    <Input
-                      id="program-item-location"
-                      value={itemForm.location}
-                      onChange={(e) => setItemForm((p) => ({ ...p, location: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="program-item-description">Descripción</Label>
-                    <Textarea
-                      id="program-item-description"
-                      value={itemForm.description}
-                      onChange={(e) => setItemForm((p) => ({ ...p, description: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="program-item-requirements">Requisitos para apoderados (opcional)</Label>
-                    <Textarea
-                      id="program-item-requirements"
-                      placeholder="Ej: traer ropa de abrigo y llegar 15 min antes."
-                      value={itemForm.requirementsMessage}
-                      onChange={(e) => setItemForm((p) => ({ ...p, requirementsMessage: e.target.value }))}
-                    />
-                  </div>
-                  {itemError ? <p className="text-sm text-destructive">{itemError}</p> : null}
-                </div>
-                <DialogFooter>
-                  <Button
-                    onClick={handleSaveItem}
-                    disabled={
-                      savingItem ||
-                      !itemForm.dayNumber.trim() ||
-                      !itemForm.time.trim() ||
-                      !itemForm.title.trim() ||
-                      !itemForm.location.trim() ||
-                      !itemForm.description.trim()
-                    }
-                  >
-                    {savingItem ? 'Guardando…' : 'Guardar'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+            <Button variant="outline" size="sm" onClick={openCreateItem}>
+              <PlusIcon />
+              Agregar
+            </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+          <CardContent className="flex flex-col gap-8">
             {groupedByDay.length ? (
               groupedByDay.map(([day, items]) => (
-                <div key={day} className="flex flex-col gap-3">
+                <div key={day} className="flex flex-col gap-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Día {day}
                   </p>
-                  {items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
-                    >
-                      <div>
-                        <p className="text-sm font-medium">
-                          {item.time} · {item.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{item.location}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
-                          <PencilIcon className="size-4" />
-                          <span className="sr-only">Editar actividad</span>
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item.id)}>
-                          <Trash2Icon className="size-4" />
-                          <span className="sr-only">Eliminar actividad</span>
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                  <Timeline className="w-full">
+                    {items.map((item, itemIdx) => (
+                      <TimelineItem key={item.id} step={itemIdx + 1}>
+                        <TimelineHeader className="flex items-start justify-between gap-3">
+                          <div>
+                            <TimelineSeparator />
+                            <TimelineIndicator />
+                            <TimelineDate>{item.time}</TimelineDate>
+                            <TimelineTitle>{item.title}</TimelineTitle>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditItem(item)}>
+                              <PencilIcon className="size-4" />
+                              <span className="sr-only">Editar actividad</span>
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item.id)}>
+                              <Trash2Icon className="size-4" />
+                              <span className="sr-only">Eliminar actividad</span>
+                            </Button>
+                          </div>
+                        </TimelineHeader>
+                        <TimelineContent>
+                          <p>{item.location}</p>
+                          {item.description ? <p className="mt-1">{item.description}</p> : null}
+                          {item.requirementsMessage ? (
+                            <p className="mt-1">Requiere: {item.requirementsMessage}</p>
+                          ) : null}
+                        </TimelineContent>
+                      </TimelineItem>
+                    ))}
+                  </Timeline>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">Sin actividades todavía.</p>
+              <EmptyState
+                icon={CalendarRangeIcon}
+                title="Sin actividades todavía."
+                description="Agrega la primera actividad de este programa."
+              />
             )}
           </CardContent>
         </Card>
       </div>
+      <ActivityItemSheet
+        open={itemOpen}
+        onOpenChange={setItemOpen}
+        activityTemplates={activityTemplates}
+        editingItem={editingItem}
+        onSubmit={handleSaveItem}
+      />
     </>
   )
 }

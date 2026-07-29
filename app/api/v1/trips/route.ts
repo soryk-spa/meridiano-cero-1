@@ -31,7 +31,7 @@ const bodySchema = z
     initialLng: z.number().min(-180).max(180),
     parentCode: z.string().trim().min(1),
     monitorCode: z.string().trim().min(1),
-    programId: z.string().trim().min(1).optional(),
+    programId: z.string().trim().min(1),
   })
   .refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
     message: 'endDate must be on or after startDate.',
@@ -50,10 +50,8 @@ export const POST = withApiHandler(async (request) => {
   const endDate = new Date(tripData.endDate)
   const totalDays = differenceInCalendarDays(endDate, startDate) + 1
 
-  if (programId) {
-    const program = await prisma.program.findUnique({ where: { id: programId } })
-    if (!program) throw new ApiError('VALIDATION_ERROR', 'Program not found.')
-  }
+  const program = await prisma.program.findUnique({ where: { id: programId } })
+  if (!program) throw new ApiError('VALIDATION_ERROR', 'Program not found.')
 
   const school = await prisma.school.upsert({
     where: { name: schoolName },
@@ -68,7 +66,7 @@ export const POST = withApiHandler(async (request) => {
       endDate,
       totalDays,
       schoolId: school.id,
-      ...(programId ? { programId } : {}),
+      programId,
       accessCodes: {
         create: [
           { code: parentCode.toUpperCase(), role: Role.PARENT },
@@ -78,9 +76,7 @@ export const POST = withApiHandler(async (request) => {
     },
   })
 
-  if (programId) {
-    await applyProgramToTrip(trip.id, programId)
-  }
+  await applyProgramToTrip(trip.id, programId)
 
   return NextResponse.json({ trip }, { status: 201 })
 })
