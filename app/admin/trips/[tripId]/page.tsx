@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { CheckIcon, CopyIcon, PencilIcon, PlusIcon, Trash2Icon, UserMinusIcon, UserPlusIcon } from 'lucide-react'
+import {
+  CalendarRangeIcon,
+  CheckIcon,
+  CopyIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  UserMinusIcon,
+  UserPlusIcon,
+} from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import type {
@@ -50,6 +59,7 @@ type TripDetail = Trip & { school: { name: string } }
 type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type ParentRow = { id: string; name: string; email: string }
 type MonitorRow = { id: string; name: string; email: string }
+type ProgramOption = { id: string; name: string }
 
 const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'FINISHED']
 const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
@@ -99,18 +109,32 @@ export default function AdminTripDetailPage() {
   const [itineraryError, setItineraryError] = useState<string | null>(null)
   const [activityTemplates, setActivityTemplates] = useState<ActivityTemplate[]>([])
   const [selectedActivityTemplateId, setSelectedActivityTemplateId] = useState<string | null>(null)
+  const [programs, setPrograms] = useState<ProgramOption[]>([])
+  const [applyProgramOpen, setApplyProgramOpen] = useState(false)
+  const [applyProgramId, setApplyProgramId] = useState<string | null>(null)
+  const [applyingProgram, setApplyingProgram] = useState(false)
+  const [applyProgramError, setApplyProgramError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [tripRes, itineraryRes, announcementsRes, locationRes, codesRes, rosterRes, activityTemplatesRes] =
-      await Promise.all([
-        fetch(`/api/v1/trips/${tripId}`),
-        fetch(`/api/v1/trips/${tripId}/itinerary`),
-        fetch(`/api/v1/trips/${tripId}/announcements`),
-        fetch(`/api/v1/trips/${tripId}/location`),
-        fetch(`/api/v1/admin/codes?tripId=${tripId}`),
-        fetch(`/api/v1/trips/${tripId}/roster`),
-        fetch('/api/v1/admin/activity-templates'),
-      ])
+    const [
+      tripRes,
+      itineraryRes,
+      announcementsRes,
+      locationRes,
+      codesRes,
+      rosterRes,
+      activityTemplatesRes,
+      programsRes,
+    ] = await Promise.all([
+      fetch(`/api/v1/trips/${tripId}`),
+      fetch(`/api/v1/trips/${tripId}/itinerary`),
+      fetch(`/api/v1/trips/${tripId}/announcements`),
+      fetch(`/api/v1/trips/${tripId}/location`),
+      fetch(`/api/v1/admin/codes?tripId=${tripId}`),
+      fetch(`/api/v1/trips/${tripId}/roster`),
+      fetch('/api/v1/admin/activity-templates'),
+      fetch('/api/v1/admin/programs'),
+    ])
     if (tripRes.ok) setTrip((await tripRes.json()).trip)
     if (itineraryRes.ok) setItinerary((await itineraryRes.json()).items)
     if (announcementsRes.ok) setAnnouncements((await announcementsRes.json()).announcements)
@@ -122,6 +146,7 @@ export default function AdminTripDetailPage() {
       setMonitors(roster.monitors)
     }
     if (activityTemplatesRes.ok) setActivityTemplates((await activityTemplatesRes.json()).activityTemplates)
+    if (programsRes.ok) setPrograms((await programsRes.json()).programs)
   }, [tripId])
 
   useEffect(() => {
@@ -286,6 +311,31 @@ export default function AdminTripDetailPage() {
     if (!window.confirm('¿Eliminar este ítem del itinerario?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/itinerary/${itemId}`, { method: 'DELETE' })
     if (res.ok) void load()
+  }
+
+  function openApplyProgram() {
+    setApplyProgramId(null)
+    setApplyProgramError(null)
+    setApplyProgramOpen(true)
+  }
+
+  async function handleApplyProgram() {
+    if (!applyProgramId) return
+    setApplyingProgram(true)
+    setApplyProgramError(null)
+    const res = await fetch(`/api/v1/admin/programs/${applyProgramId}/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tripId }),
+    })
+    setApplyingProgram(false)
+    if (res.ok) {
+      setApplyProgramOpen(false)
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      setApplyProgramError(data?.error?.message ?? 'No se pudo aplicar el programa.')
+    }
   }
 
   async function handleDeleteAnnouncement(id: string) {
@@ -488,13 +538,51 @@ export default function AdminTripDetailPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Itinerario</CardTitle>
-              <Dialog open={itineraryOpen} onOpenChange={setItineraryOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" onClick={openCreateItinerary}>
-                    <PlusIcon />
-                    Agregar
-                  </Button>
-                </DialogTrigger>
+              <div className="flex items-center gap-2">
+                <Dialog open={applyProgramOpen} onOpenChange={setApplyProgramOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={openApplyProgram}>
+                      <CalendarRangeIcon />
+                      Aplicar programa
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Aplicar programa</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-2">
+                        <Label>Programa</Label>
+                        <Combobox
+                          options={programs.map((p) => ({ value: p.id, label: p.name }))}
+                          value={applyProgramId}
+                          onSelect={setApplyProgramId}
+                          placeholder="Elegir un programa…"
+                          emptyLabel="Sin programas disponibles."
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Agrega las actividades del programa al itinerario de esta gira, sin tocar los ítems
+                        que ya existen.
+                      </p>
+                      {applyProgramError ? (
+                        <p className="text-sm text-destructive">{applyProgramError}</p>
+                      ) : null}
+                    </div>
+                    <DialogFooter>
+                      <Button onClick={handleApplyProgram} disabled={applyingProgram || !applyProgramId}>
+                        {applyingProgram ? 'Aplicando…' : 'Aplicar'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+                <Dialog open={itineraryOpen} onOpenChange={setItineraryOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={openCreateItinerary}>
+                      <PlusIcon />
+                      Agregar
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>{editingItemId ? 'Editar ítem' : 'Nuevo ítem de itinerario'}</DialogTitle>
@@ -597,6 +685,7 @@ export default function AdminTripDetailPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              </div>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {itinerary.length ? (

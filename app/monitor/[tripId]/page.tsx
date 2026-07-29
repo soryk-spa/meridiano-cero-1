@@ -4,19 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useUser } from '@clerk/nextjs'
-import {
-  Radio,
-  Navigation,
-  Send,
-  CheckCircle2,
-  Circle,
-  Signal,
-  Camera,
-  Trash2,
-  Loader2,
-} from 'lucide-react'
-import type { AnnouncementTemplate, Trip, ItineraryItem, ItineraryStatus, TripStatus } from '@prisma/client'
-import { tripStatusLabels, itineraryStatusLabels } from '@/lib/labels'
+import { Radio, Navigation, Send, Signal, Camera, Trash2, Loader2, CheckCircle } from 'lucide-react'
+import type { AnnouncementTemplate, Trip, ItineraryItem, ItineraryStatus } from '@prisma/client'
+import { itineraryStatusLabels } from '@/lib/labels'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,12 +14,32 @@ import { Separator } from '@/components/ui/separator'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
-const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING']
+type ActivityTransition = 'EN_RUTA' | 'EN_ACTIVIDAD' | 'TERMINADA'
 
-const NEXT_ITINERARY_STATUS: Record<ItineraryStatus, ItineraryStatus> = {
-  PENDING: 'IN_PROGRESS',
-  IN_PROGRESS: 'COMPLETED',
-  COMPLETED: 'PENDING',
+const TRANSITION_OPTIONS: { value: ActivityTransition; label: string }[] = [
+  { value: 'EN_RUTA', label: 'En ruta' },
+  { value: 'EN_ACTIVIDAD', label: 'En actividad' },
+  { value: 'TERMINADA', label: 'Terminada' },
+]
+
+const STATUS_BY_TRANSITION: Record<ActivityTransition, ItineraryStatus> = {
+  EN_RUTA: 'PENDING',
+  EN_ACTIVIDAD: 'IN_PROGRESS',
+  TERMINADA: 'COMPLETED',
+}
+
+const TRANSITION_LABEL: Record<ActivityTransition, string> = {
+  EN_RUTA: 'En ruta',
+  EN_ACTIVIDAD: 'En actividad',
+  TERMINADA: 'Terminada',
+}
+
+// The auto comunicado's text is generated here so the monitor never has to
+// type or pick a message for a routine activity status change.
+const MESSAGE_BY_TRANSITION: Record<ActivityTransition, (title: string) => string> = {
+  EN_RUTA: (title) => `En ruta a: ${title}`,
+  EN_ACTIVIDAD: (title) => `Actividad en curso: ${title}`,
+  TERMINADA: (title) => `Actividad terminada: ${title}`,
 }
 
 interface GpsPoint {
@@ -37,14 +47,6 @@ interface GpsPoint {
   lng: number
   accuracy: number
   updatedAt: Date
-}
-
-function ItineraryStatusIcon({ status }: { status: ItineraryStatus }) {
-  if (status === 'COMPLETED') return <CheckCircle2 size={20} className="text-emerald-500 shrink-0" />
-  if (status === 'IN_PROGRESS') {
-    return <div className="size-5 shrink-0 rounded-full border-4 border-primary/20 bg-primary animate-pulse" />
-  }
-  return <Circle size={20} className="text-border shrink-0" />
 }
 
 export default function MonitorPage() {
@@ -62,15 +64,23 @@ export default function MonitorPage() {
   const [sent, setSent] = useState<string[]>([])
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const [sendingRequirementsId, setSendingRequirementsId] = useState<string | null>(null)
+  const [applyingTransition, setApplyingTransition] = useState<{ itemId: string; transition: ActivityTransition } | null>(
+    null
+  )
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingItemId = useRef<string | null>(null)
+  const pendingTransition = useRef<ActivityTransition | null>(null)
+
+  const loadItinerary = useCallback(async () => {
+    const res = await fetch(`/api/v1/trips/${tripId}/itinerary`)
+    if (res.ok) setItems((await res.json()).items)
+  }, [tripId])
 
   useEffect(() => {
     async function load() {
-      const [tripRes, itineraryRes, templatesRes] = await Promise.all([
+      const [tripRes, templatesRes] = await Promise.all([
         fetch(`/api/v1/trips/${tripId}`),
-        fetch(`/api/v1/trips/${tripId}/itinerary`),
         fetch('/api/v1/announcement-templates'),
       ])
       if (tripRes.ok) {
@@ -78,11 +88,11 @@ export default function MonitorPage() {
         setTrip(loadedTrip)
         setGps({ lat: loadedTrip.initialLat, lng: loadedTrip.initialLng, accuracy: 12, updatedAt: new Date() })
       }
-      if (itineraryRes.ok) setItems((await itineraryRes.json()).items)
       if (templatesRes.ok) setTemplates((await templatesRes.json()).templates)
+      await loadItinerary()
     }
     load()
-  }, [tripId])
+  }, [tripId, loadItinerary])
 
   const updateGps = useCallback(() => {
     function commit(lat: number, lng: number, accuracy: number) {
@@ -124,13 +134,56 @@ export default function MonitorPage() {
     }
   }, [tracking, updateGps])
 
-  async function setTripStatus(status: TripStatus) {
-    setTrip((p) => (p ? { ...p, status } : p))
-    await fetch(`/api/v1/trips/${tripId}`, {
+  async function applyTransition(item: ItineraryItem, transition: ActivityTransition, photoFile?: File) {
+    setApplyingTransition({ itemId: item.id, transition })
+
+    if (photoFile) {
+      const photoForm = new FormData()
+      photoForm.append('file', photoFile)
+      const photoRes = await fetch(`/api/v1/trips/${tripId}/itinerary/${item.id}/photo`, {
+        method: 'POST',
+        body: photoForm,
+      })
+      if (!photoRes.ok) {
+        setApplyingTransition(null)
+        return
+      }
+    }
+
+    const statusRes = await fetch(`/api/v1/trips/${tripId}/itinerary/${item.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status: STATUS_BY_TRANSITION[transition] }),
     })
+    if (!statusRes.ok) {
+      setApplyingTransition(null)
+      return
+    }
+
+    const announcementForm = new FormData()
+    announcementForm.append('title', TRANSITION_LABEL[transition])
+    announcementForm.append('message', MESSAGE_BY_TRANSITION[transition](item.title))
+    announcementForm.append('authorName', user?.fullName ?? 'Monitor')
+    announcementForm.append('type', 'INFO')
+    if (photoFile) announcementForm.append('file', photoFile)
+
+    await fetch(`/api/v1/trips/${tripId}/announcements`, {
+      method: 'POST',
+      body: announcementForm,
+    })
+
+    setApplyingTransition(null)
+    void loadItinerary()
+  }
+
+  function handleTransitionClick(item: ItineraryItem, transition: ActivityTransition) {
+    if (transition === 'EN_ACTIVIDAD') {
+      pendingItemId.current = item.id
+      pendingTransition.current = transition
+      fileInputRef.current?.click()
+      return
+    }
+    void applyTransition(item, transition)
   }
 
   async function sendAnnouncement() {
@@ -172,29 +225,25 @@ export default function MonitorPage() {
     if (res.ok) setSent((p) => [item.requirementsMessage as string, ...p])
   }
 
-  async function cycleItemStatus(id: string) {
-    const item = items.find((i) => i.id === id)
-    if (!item) return
-    const status = NEXT_ITINERARY_STATUS[item.status]
-
-    setItems((p) => p.map((i) => (i.id === id ? { ...i, status } : i)))
-    await fetch(`/api/v1/trips/${tripId}/itinerary/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-  }
-
   function triggerPhotoUpload(itemId: string) {
     pendingItemId.current = itemId
+    pendingTransition.current = null
     fileInputRef.current?.click()
   }
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     const itemId = pendingItemId.current
+    const transition = pendingTransition.current
     event.target.value = ''
+    pendingTransition.current = null
     if (!file || !itemId) return
+
+    if (transition) {
+      const item = items.find((i) => i.id === itemId)
+      if (item) await applyTransition(item, transition, file)
+      return
+    }
 
     setUploadingId(itemId)
     const formData = new FormData()
@@ -221,6 +270,10 @@ export default function MonitorPage() {
   }
 
   if (!trip || !gps) return <div className="p-8 text-center text-muted-foreground">Cargando…</div>
+
+  // The activity the monitor should be acting on right now: the first
+  // itinerary item (already ordered by the API) that isn't done yet.
+  const currentActivity = items.find((item) => item.status !== 'COMPLETED') ?? null
 
   return (
     <div className="flex flex-1 flex-col">
@@ -264,22 +317,55 @@ export default function MonitorPage() {
                 </CardContent>
               </Card>
 
-              {/* Status selector */}
+              {/* Current activity */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm">Estado del grupo</CardTitle>
+                  <CardTitle className="text-sm">Actividad actual</CardTitle>
                 </CardHeader>
-                <CardContent className="grid grid-cols-2 gap-2">
-                  {STATUS_OPTIONS.map((s) => (
-                    <Button
-                      key={s}
-                      onClick={() => setTripStatus(s)}
-                      variant={trip.status === s ? 'default' : 'outline'}
-                      className="justify-start"
-                    >
-                      {tripStatusLabels[s]}
-                    </Button>
-                  ))}
+                <CardContent className="space-y-3">
+                  {currentActivity ? (
+                    <>
+                      <div>
+                        <p className="text-sm font-semibold">{currentActivity.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Día {currentActivity.dayNumber} · {currentActivity.time} · {currentActivity.location}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {TRANSITION_OPTIONS.map((option) => {
+                          const isTerminada = option.value === 'TERMINADA'
+                          const isBusy =
+                            applyingTransition?.itemId === currentActivity.id &&
+                            applyingTransition.transition === option.value
+                          return (
+                            <Button
+                              key={option.value}
+                              variant="outline"
+                              size="sm"
+                              disabled={applyingTransition !== null}
+                              onClick={() => handleTransitionClick(currentActivity, option.value)}
+                              className={
+                                isTerminada
+                                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                  : 'border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              }
+                            >
+                              {isBusy ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : option.value === 'EN_ACTIVIDAD' ? (
+                                <Camera size={14} />
+                              ) : isTerminada ? (
+                                <CheckCircle size={14} />
+                              ) : null}
+                              {option.label}
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Sin actividades pendientes por ahora.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -349,14 +435,6 @@ export default function MonitorPage() {
                         {dayItems.map((item, i) => (
                           <div key={item.id}>
                             <div className="flex items-start gap-3 py-3">
-                              <button
-                                onClick={() => cycleItemStatus(item.id)}
-                                className="mt-0.5 shrink-0 rounded-full transition-transform hover:scale-110"
-                                aria-label="Cambiar estado del hito"
-                              >
-                                <ItineraryStatusIcon status={item.status} />
-                              </button>
-
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className={`text-sm font-medium ${item.status === 'COMPLETED' ? 'text-muted-foreground line-through' : ''}`}>
@@ -370,6 +448,38 @@ export default function MonitorPage() {
                                   {item.time} · {item.location}
                                 </p>
                                 <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                  {TRANSITION_OPTIONS.map((option) => {
+                                    const isTerminada = option.value === 'TERMINADA'
+                                    const isBusy =
+                                      applyingTransition?.itemId === item.id &&
+                                      applyingTransition.transition === option.value
+                                    return (
+                                      <Button
+                                        key={option.value}
+                                        variant="outline"
+                                        size="sm"
+                                        disabled={applyingTransition !== null}
+                                        onClick={() => handleTransitionClick(item, option.value)}
+                                        className={
+                                          isTerminada
+                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                            : 'border-amber-500 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                        }
+                                      >
+                                        {isBusy ? (
+                                          <Loader2 size={14} className="animate-spin" />
+                                        ) : option.value === 'EN_ACTIVIDAD' ? (
+                                          <Camera size={14} />
+                                        ) : isTerminada ? (
+                                          <CheckCircle size={14} />
+                                        ) : null}
+                                        {option.label}
+                                      </Button>
+                                    )
+                                  })}
+                                </div>
 
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                   {item.photoUrl ? (

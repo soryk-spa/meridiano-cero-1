@@ -1,0 +1,37 @@
+import { prisma } from '@/lib/db'
+import { ApiError } from '@/lib/api/errors'
+
+/**
+ * Copies a Program's items onto a trip's itinerary (one-shot, not a live sync —
+ * editing the Program afterwards never rewrites itinerary items already copied).
+ */
+export async function applyProgramToTrip(tripId: string, programId: string) {
+  const program = await prisma.program.findUnique({
+    where: { id: programId },
+    include: { items: { orderBy: [{ dayNumber: 'asc' }, { order: 'asc' }] } },
+  })
+  if (!program) throw new ApiError('NOT_FOUND', 'Program not found.')
+  if (program.items.length === 0) throw new ApiError('VALIDATION_ERROR', 'This program has no items yet.')
+
+  const last = await prisma.itineraryItem.findFirst({ where: { tripId }, orderBy: { order: 'desc' } })
+  let nextOrder = (last?.order ?? -1) + 1
+
+  const items = await Promise.all(
+    program.items.map((item) =>
+      prisma.itineraryItem.create({
+        data: {
+          tripId,
+          dayNumber: item.dayNumber,
+          time: item.time,
+          title: item.title,
+          location: item.location,
+          description: item.description,
+          requirementsMessage: item.requirementsMessage,
+          order: nextOrder++,
+        },
+      })
+    )
+  )
+
+  return items
+}

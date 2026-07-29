@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { MapPinPlusIcon, RefreshCwIcon } from 'lucide-react'
@@ -23,6 +23,9 @@ import { KNOWN_DESTINATIONS } from '@/lib/destinations'
 import { generateAccessCode } from '@/lib/generate-code'
 
 const CUSTOM_DESTINATION = 'custom'
+const NO_PROGRAM = 'none'
+
+type ProgramOption = { id: string; name: string }
 
 const EMPTY_FORM = {
   name: '',
@@ -42,6 +45,14 @@ export default function NewTripPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [programs, setPrograms] = useState<ProgramOption[]>([])
+  const [programId, setProgramId] = useState(NO_PROGRAM)
+
+  useEffect(() => {
+    fetch('/api/v1/admin/programs')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setPrograms(data.programs))
+  }, [])
 
   const isCustomDestination = destinationId === CUSTOM_DESTINATION
   const totalDays =
@@ -73,6 +84,7 @@ export default function NewTripPage() {
         studentCount: Number(form.studentCount),
         initialLat: Number(form.initialLat),
         initialLng: Number(form.initialLng),
+        ...(programId !== NO_PROGRAM ? { programId } : {}),
       }),
     })
     setSubmitting(false)
@@ -163,6 +175,28 @@ export default function NewTripPage() {
                   />
                 </div>
               ) : null}
+
+              <div className="flex flex-col gap-2">
+                <Label>Programa (opcional)</Label>
+                <Select value={programId} onValueChange={setProgramId}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sin programa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_PROGRAM}>Sin programa</SelectItem>
+                    {programs.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {programId !== NO_PROGRAM ? (
+                  <p className="text-xs text-muted-foreground">
+                    El itinerario se completa automáticamente con las actividades de este programa.
+                  </p>
+                ) : null}
+              </div>
 
               <div className="flex flex-col gap-2 sm:col-span-2">
                 <Label>Fechas de la gira</Label>

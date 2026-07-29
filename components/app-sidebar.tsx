@@ -4,6 +4,7 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  IconCalendarStats,
   IconChartBar,
   IconClipboardList,
   IconDashboard,
@@ -38,6 +39,7 @@ import {
 const navMainItems = [
   { title: "Dashboard", url: "/admin", icon: IconDashboard },
   { title: "Giras", url: "/admin/trips", icon: IconRoute },
+  { title: "Programas", url: "/admin/programs", icon: IconCalendarStats },
   { title: "Analítica", url: "/admin/analytics", icon: IconChartBar },
   { title: "Mapa operativo", url: "/admin/map", icon: IconMap },
   { title: "Equipo", url: "/admin/team", icon: IconUsers },

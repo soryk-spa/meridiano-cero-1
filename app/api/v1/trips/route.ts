@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db'
 import { ApiError } from '@/lib/api/errors'
 import { requireAdmin } from '@/lib/api/require-role'
 import { withApiHandler } from '@/lib/api/handler'
+import { applyProgramToTrip } from '@/lib/api/programs'
 
 export const GET = withApiHandler(async () => {
   await requireAdmin()
@@ -30,6 +31,7 @@ const bodySchema = z
     initialLng: z.number().min(-180).max(180),
     parentCode: z.string().trim().min(1),
     monitorCode: z.string().trim().min(1),
+    programId: z.string().trim().min(1).optional(),
   })
   .refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
     message: 'endDate must be on or after startDate.',
@@ -43,10 +45,15 @@ export const POST = withApiHandler(async (request) => {
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'Missing or invalid trip fields.')
 
-  const { schoolName, parentCode, monitorCode, ...tripData } = parsed.data
+  const { schoolName, parentCode, monitorCode, programId, ...tripData } = parsed.data
   const startDate = new Date(tripData.startDate)
   const endDate = new Date(tripData.endDate)
   const totalDays = differenceInCalendarDays(endDate, startDate) + 1
+
+  if (programId) {
+    const program = await prisma.program.findUnique({ where: { id: programId } })
+    if (!program) throw new ApiError('VALIDATION_ERROR', 'Program not found.')
+  }
 
   const school = await prisma.school.upsert({
     where: { name: schoolName },
@@ -61,6 +68,7 @@ export const POST = withApiHandler(async (request) => {
       endDate,
       totalDays,
       schoolId: school.id,
+      ...(programId ? { programId } : {}),
       accessCodes: {
         create: [
           { code: parentCode.toUpperCase(), role: Role.PARENT },
@@ -69,6 +77,10 @@ export const POST = withApiHandler(async (request) => {
       },
     },
   })
+
+  if (programId) {
+    await applyProgramToTrip(trip.id, programId)
+  }
 
   return NextResponse.json({ trip }, { status: 201 })
 })

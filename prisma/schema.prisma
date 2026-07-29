@@ -58,6 +58,8 @@ model Trip {
   studentCount Int
   initialLat   Float
   initialLng   Float
+  programId    String?
+  program      Program?   @relation(fields: [programId], references: [id])
   createdAt    DateTime   @default(now())
 
   memberships    TripMembership[]
@@ -65,6 +67,29 @@ model Trip {
   itineraryItems ItineraryItem[]
   announcements  Announcement[]
   locationPings  LocationPing[]
+}
+
+model Program {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+
+  items ProgramItem[]
+  trips Trip[]
+}
+
+model ProgramItem {
+  id                  String  @id @default(cuid())
+  programId           String
+  program             Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+  dayNumber           Int
+  time                String
+  title               String
+  location            String
+  description         String
+  requirementsMessage String?
+  order               Int
 }
 
 model AccessCode {
