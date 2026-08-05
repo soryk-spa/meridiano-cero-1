@@ -7,6 +7,7 @@ import {
   CalendarRangeIcon,
   CheckIcon,
   CopyIcon,
+  MailPlusIcon,
   MessageSquareIcon,
   PencilIcon,
   PlusIcon,
@@ -26,6 +27,7 @@ import type {
   LocationPing,
   Role,
   Trip,
+  TripLeg,
   TripStatus,
 } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
@@ -60,16 +62,17 @@ import { itineraryStatusLabels, announcementTypeLabels, tripStatusLabels } from 
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
-type TripDetail = Trip & { school: { name: string } }
+type TripDetail = Trip & { school: { name: string }; legs: TripLeg[] }
 type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type ParentRow = { id: string; name: string; email: string }
 type MonitorRow = { id: string; name: string; email: string }
+type StudentRow = { id: string; name: string; email: string }
 type ProgramOption = { id: string; name: string }
 
 const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'FINISHED']
-const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
+const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
 
-const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '' }
+const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '', hotel: '' }
 const EMPTY_MONITOR_FORM = { firstName: '', lastName: '', emailAddress: '' }
 
 export default function AdminTripDetailPage() {
@@ -83,6 +86,11 @@ export default function AdminTripDetailPage() {
   const [codes, setCodes] = useState<CodeRow[]>([])
   const [parents, setParents] = useState<ParentRow[]>([])
   const [monitors, setMonitors] = useState<MonitorRow[]>([])
+  const [students, setStudents] = useState<StudentRow[]>([])
+  const [inviteStudentOpen, setInviteStudentOpen] = useState(false)
+  const [studentEmail, setStudentEmail] = useState('')
+  const [invitingStudent, setInvitingStudent] = useState(false)
+  const [inviteStudentError, setInviteStudentError] = useState<string | null>(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [addingRole, setAddingRole] = useState<Role | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -137,6 +145,7 @@ export default function AdminTripDetailPage() {
       const roster = await rosterRes.json()
       setParents(roster.parents)
       setMonitors(roster.monitors)
+      setStudents(roster.students)
     }
     if (activityTemplatesRes.ok) setActivityTemplates((await activityTemplatesRes.json()).activityTemplates)
     if (programsRes.ok) setPrograms((await programsRes.json()).programs)
@@ -168,6 +177,7 @@ export default function AdminTripDetailPage() {
       name: trip.name,
       destination: trip.destination,
       studentCount: String(trip.studentCount),
+      hotel: trip.hotel ?? '',
     })
     setEditDateRange({ from: new Date(trip.startDate), to: new Date(trip.endDate) })
     setEditError(null)
@@ -193,6 +203,7 @@ export default function AdminTripDetailPage() {
         name: editForm.name,
         destination: editForm.destination,
         studentCount: Number(editForm.studentCount),
+        hotel: editForm.hotel.trim() || null,
         startDate: editDateRange.from.toISOString(),
         endDate: editDateRange.to.toISOString(),
       }),
@@ -357,6 +368,45 @@ export default function AdminTripDetailPage() {
     }
   }
 
+  async function handleRemoveStudent(membershipId: string) {
+    if (!window.confirm('¿Quitar a este alumno de la gira?')) return
+    const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
+    if (res.ok) {
+      toast.success('Alumno quitado de la gira.')
+      void load()
+    } else {
+      const data = await res.json().catch(() => null)
+      toast.error(data?.error?.message ?? 'No se pudo quitar al alumno.')
+    }
+  }
+
+  function openInviteStudent() {
+    setStudentEmail('')
+    setInviteStudentError(null)
+    setInviteStudentOpen(true)
+  }
+
+  async function handleInviteStudent() {
+    setInvitingStudent(true)
+    setInviteStudentError(null)
+    const res = await fetch(`/api/v1/trips/${tripId}/students/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ emailAddress: studentEmail }),
+    })
+    setInvitingStudent(false)
+    if (res.ok) {
+      toast.success('Invitación enviada.')
+      setStudentEmail('')
+      setInviteStudentOpen(false)
+    } else {
+      const data = await res.json().catch(() => null)
+      const message = data?.error?.message ?? 'No se pudo enviar la invitación.'
+      setInviteStudentError(message)
+      toast.error(message)
+    }
+  }
+
   function openAddMonitor() {
     setMonitorForm(EMPTY_MONITOR_FORM)
     setAddMonitorError(null)
@@ -450,6 +500,14 @@ export default function AdminTripDetailPage() {
                       type="number"
                       value={editForm.studentCount}
                       onChange={(e) => setEditForm((p) => ({ ...p, studentCount: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="edit-hotel">Hotel</Label>
+                    <Input
+                      id="edit-hotel"
+                      value={editForm.hotel}
+                      onChange={(e) => setEditForm((p) => ({ ...p, hotel: e.target.value }))}
                     />
                   </div>
                 </div>
@@ -546,6 +604,22 @@ export default function AdminTripDetailPage() {
             </CardContent>
           )}
         </Card>
+
+        {trip.legs.length > 1 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">Ruta</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap items-center gap-2">
+              {trip.legs.map((leg, index) => (
+                <span key={leg.id} className="flex items-center gap-2">
+                  <Badge variant="secondary">{leg.label}</Badge>
+                  {index < trip.legs.length - 1 ? <span className="text-muted-foreground">→</span> : null}
+                </span>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
           </TabsContent>
 
           <TabsContent value="itinerario" className="mt-4">
@@ -724,6 +798,67 @@ export default function AdminTripDetailPage() {
                 icon={UsersIcon}
                 title="Sin apoderados registrados todavía."
                 description="Se suman automáticamente al usar el código de acceso de apoderado."
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Alumnos ({students.length})</CardTitle>
+            <Dialog open={inviteStudentOpen} onOpenChange={setInviteStudentOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" onClick={openInviteStudent}>
+                  <MailPlusIcon />
+                  Invitar alumno
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invitar alumno a esta gira</DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="student-email">Correo electrónico</Label>
+                  <Input
+                    id="student-email"
+                    type="email"
+                    placeholder="alumno@correo.cl"
+                    value={studentEmail}
+                    onChange={(e) => setStudentEmail(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Se enviará una invitación por correo. Al registrarse con ese enlace, queda asociado a
+                    esta gira con acceso de solo lectura (itinerario, ubicación y comunicados).
+                  </p>
+                  {inviteStudentError ? <p className="text-sm text-destructive">{inviteStudentError}</p> : null}
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleInviteStudent} disabled={invitingStudent || !studentEmail}>
+                    {invitingStudent ? 'Enviando…' : 'Enviar invitación'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {students.length ? (
+              students.map((student) => (
+                <div key={student.id} className="flex items-center justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{student.name}</span>
+                    <span className="text-xs text-muted-foreground">{student.email}</span>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={() => handleRemoveStudent(student.id)}>
+                    <UserMinusIcon className="size-4" />
+                    <span className="sr-only">Quitar alumno</span>
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <EmptyState
+                icon={UsersIcon}
+                title="Sin alumnos invitados todavía."
+                description="Invita a un alumno por correo para darle acceso de solo lectura a esta gira."
               />
             )}
           </CardContent>

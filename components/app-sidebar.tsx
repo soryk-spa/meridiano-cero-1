@@ -5,11 +5,11 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   IconCalendarStats,
-  IconChartBar,
   IconClipboardList,
   IconDashboard,
   IconDatabase,
   IconHelp,
+  IconLayoutGrid,
   IconMap,
   IconMapPinPlus,
   IconMessage2,
@@ -39,19 +39,22 @@ import {
 const navMainItems = [
   { title: "Dashboard", url: "/admin", icon: IconDashboard },
   { title: "Giras", url: "/admin/trips", icon: IconRoute },
-  { title: "Programas", url: "/admin/programs", icon: IconCalendarStats },
-  { title: "Analítica", url: "/admin/analytics", icon: IconChartBar },
   { title: "Mapa operativo", url: "/admin/map", icon: IconMap },
-  { title: "Equipo", url: "/admin/team", icon: IconUsers },
-  { title: "Usuarios", url: "/admin/users", icon: IconUserCog },
+  { title: "Organizador", url: "/admin/schedule", icon: IconLayoutGrid },
+  { title: "Reportes", url: "/admin/reports", icon: IconReport },
 ]
 
-const documentItems = [
-  { name: "Códigos", url: "/admin/codes", icon: IconTicket },
-  { name: "Reportes", url: "/admin/reports", icon: IconReport },
-  { name: "Colegios", url: "/admin/schools", icon: IconDatabase },
-  { name: "Mensajes", url: "/admin/messages", icon: IconMessage2 },
+const contentItems = [
+  { name: "Programas", url: "/admin/programs", icon: IconCalendarStats },
   { name: "Actividades", url: "/admin/activities", icon: IconClipboardList },
+  { name: "Mensajes", url: "/admin/messages", icon: IconMessage2 },
+]
+
+const managementItems = [
+  { name: "Colegios", url: "/admin/schools", icon: IconDatabase },
+  { name: "Códigos", url: "/admin/codes", icon: IconTicket },
+  { name: "Equipo", url: "/admin/team", icon: IconUsers },
+  { name: "Usuarios", url: "/admin/users", icon: IconUserCog },
 ]
 
 const data = {
@@ -101,7 +104,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           items={navMain}
           quickAction={{ title: "Nueva gira", url: "/admin/trips/new", icon: IconMapPinPlus }}
         />
-        <NavDocuments items={documentItems} />
+        <NavDocuments label="Contenido" items={contentItems} />
+        <NavDocuments label="Gestión" items={managementItems} />
         <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

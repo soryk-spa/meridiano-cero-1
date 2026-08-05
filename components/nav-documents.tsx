@@ -16,16 +16,18 @@ type NavIcon = ComponentType<{ className?: string }>
 
 export function NavDocuments({
   items,
+  label = "Gestión",
 }: {
   items: {
     name: string
     url: string
     icon: NavIcon
   }[]
+  label?: string
 }) {
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Gestión</SidebarGroupLabel>
+      <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (

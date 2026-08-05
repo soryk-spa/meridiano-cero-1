@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type L from 'leaflet'
 
 export interface FleetMarker {
@@ -39,6 +39,7 @@ export default function FleetMapView({ markers, height = '480px', selectedId, on
   const leafletRef = useRef<typeof L | null>(null)
   const markerLayerRef = useRef<L.LayerGroup | null>(null)
   const markerRefs = useRef<Map<string, L.Marker>>(new Map())
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -66,6 +67,7 @@ export default function FleetMapView({ markers, height = '480px', selectedId, on
       mapRef.current = localMap
       leafletRef.current = Leaflet
       markerLayerRef.current = Leaflet.layerGroup().addTo(localMap)
+      setReady(true)
     })
 
     const markers = markerRefs.current
@@ -77,6 +79,7 @@ export default function FleetMapView({ markers, height = '480px', selectedId, on
       mapRef.current = null
       markerLayerRef.current = null
       markers.clear()
+      setReady(false)
     }
   }, [])
 
@@ -105,7 +108,7 @@ export default function FleetMapView({ markers, height = '480px', selectedId, on
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [markers])
+  }, [markers, ready])
 
   useEffect(() => {
     const map = mapRef.current

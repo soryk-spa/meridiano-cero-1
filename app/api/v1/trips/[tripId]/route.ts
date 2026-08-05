@@ -14,7 +14,7 @@ export const GET = withApiHandler<{ tripId: string }>(async (_request, { params 
 
   const trip = await prisma.trip.findUnique({
     where: { id: tripId },
-    include: { school: { select: { name: true } } },
+    include: { school: { select: { name: true } }, legs: { orderBy: { order: 'asc' } } },
   })
   if (!trip) throw new ApiError('NOT_FOUND', 'Trip not found.')
 
@@ -28,6 +28,7 @@ const patchSchema = z.object({
   startDate: z.iso.datetime().optional(),
   endDate: z.iso.datetime().optional(),
   studentCount: z.number().int().nonnegative().optional(),
+  hotel: z.string().trim().min(1).nullable().optional(),
 })
 
 export const PATCH = withApiHandler<{ tripId: string }>(async (request, { params }) => {

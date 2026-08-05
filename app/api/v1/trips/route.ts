@@ -32,6 +32,16 @@ const bodySchema = z
     parentCode: z.string().trim().min(1),
     monitorCode: z.string().trim().min(1),
     programId: z.string().trim().min(1),
+    hotel: z.string().trim().min(1).optional(),
+    legs: z
+      .array(
+        z.object({
+          label: z.string().trim().min(1),
+          lat: z.number().min(-90).max(90),
+          lng: z.number().min(-180).max(180),
+        })
+      )
+      .optional(),
   })
   .refine((data) => new Date(data.endDate) >= new Date(data.startDate), {
     message: 'endDate must be on or after startDate.',
@@ -45,7 +55,7 @@ export const POST = withApiHandler(async (request) => {
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'Missing or invalid trip fields.')
 
-  const { schoolName, parentCode, monitorCode, programId, ...tripData } = parsed.data
+  const { schoolName, parentCode, monitorCode, programId, legs, ...tripData } = parsed.data
   const startDate = new Date(tripData.startDate)
   const endDate = new Date(tripData.endDate)
   const totalDays = differenceInCalendarDays(endDate, startDate) + 1
@@ -73,6 +83,9 @@ export const POST = withApiHandler(async (request) => {
           { code: monitorCode.toUpperCase(), role: Role.MONITOR },
         ],
       },
+      ...(legs && legs.length > 0
+        ? { legs: { create: legs.map((leg, index) => ({ ...leg, order: index })) } }
+        : {}),
     },
   })
 

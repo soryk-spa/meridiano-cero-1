@@ -41,7 +41,7 @@ type UserRow = {
 }
 type TripOption = { id: string; name: string }
 
-const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
+const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
 
 function initialsFor(name: string) {
   return name

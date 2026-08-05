@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { MapPinPlusIcon, RefreshCwIcon } from 'lucide-react'
+import { MapPinPlusIcon, PlusIcon, RefreshCwIcon, XIcon } from 'lucide-react'
 import { differenceInCalendarDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 import { SiteHeader } from '@/components/site-header'
@@ -25,6 +25,7 @@ import { generateAccessCode } from '@/lib/generate-code'
 const CUSTOM_DESTINATION = 'custom'
 
 type ProgramOption = { id: string; name: string }
+type ExtraLeg = { key: string; destinationId: string }
 
 const EMPTY_FORM = {
   name: '',
@@ -33,6 +34,7 @@ const EMPTY_FORM = {
   studentCount: '',
   initialLat: '',
   initialLng: '',
+  hotel: '',
   parentCode: '',
   monitorCode: '',
 }
@@ -46,6 +48,8 @@ export default function NewTripPage() {
   const [error, setError] = useState<string | null>(null)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
   const [programId, setProgramId] = useState('')
+  const [extraLegs, setExtraLegs] = useState<ExtraLeg[]>([])
+  const legKeyCounter = useRef(0)
 
   useEffect(() => {
     fetch('/api/v1/admin/programs')
@@ -56,6 +60,10 @@ export default function NewTripPage() {
   const isCustomDestination = destinationId === CUSTOM_DESTINATION
   const totalDays =
     dateRange?.from && dateRange?.to ? differenceInCalendarDays(dateRange.to, dateRange.from) + 1 : null
+
+  const resolvedExtraLegs = extraLegs
+    .map((leg) => KNOWN_DESTINATIONS.find((d) => d.id === leg.destinationId))
+    .filter((d): d is (typeof KNOWN_DESTINATIONS)[number] => !!d)
 
   function handleDestinationChange(id: string) {
     setDestinationId(id)
@@ -69,10 +77,40 @@ export default function NewTripPage() {
     }
   }
 
+  function addLeg() {
+    legKeyCounter.current += 1
+    setExtraLegs((p) => [...p, { key: String(legKeyCounter.current), destinationId: '' }])
+  }
+
+  function updateLeg(key: string, destinationId: string) {
+    setExtraLegs((p) => p.map((leg) => (leg.key === key ? { ...leg, destinationId } : leg)))
+    const known = KNOWN_DESTINATIONS.find((d) => d.id === destinationId)
+    if (known && form.destination.trim()) {
+      const labels = [
+        form.destination,
+        ...extraLegs
+          .map((leg) => (leg.key === key ? known.label : KNOWN_DESTINATIONS.find((d) => d.id === leg.destinationId)?.label))
+          .filter(Boolean),
+      ]
+      setForm((p) => ({ ...p, destination: labels.join(' → ') }))
+    }
+  }
+
+  function removeLeg(key: string) {
+    setExtraLegs((p) => p.filter((leg) => leg.key !== key))
+  }
+
   async function handleCreateTrip() {
     if (!dateRange?.from || !dateRange?.to || !programId) return
     setSubmitting(true)
     setError(null)
+    const legs =
+      resolvedExtraLegs.length > 0
+        ? [
+            { label: form.destination.trim(), lat: Number(form.initialLat), lng: Number(form.initialLng) },
+            ...resolvedExtraLegs.map((d) => ({ label: d.label, lat: d.lat, lng: d.lng })),
+          ]
+        : undefined
     const res = await fetch('/api/v1/trips', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -83,7 +121,9 @@ export default function NewTripPage() {
         studentCount: Number(form.studentCount),
         initialLat: Number(form.initialLat),
         initialLng: Number(form.initialLng),
+        hotel: form.hotel.trim() || undefined,
         programId,
+        legs,
       }),
     })
     setSubmitting(false)
@@ -176,6 +216,36 @@ export default function NewTripPage() {
                 </div>
               ) : null}
 
+              {extraLegs.length > 0 ? (
+                <div className="flex flex-col gap-2 sm:col-span-2">
+                  <Label>Destinos adicionales</Label>
+                  {extraLegs.map((leg, index) => (
+                    <div key={leg.key} className="flex gap-2">
+                      <Select value={leg.destinationId} onValueChange={(value) => updateLeg(leg.key, value)}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder={`Destino ${index + 2}…`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {KNOWN_DESTINATIONS.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button type="button" variant="outline" size="icon" onClick={() => removeLeg(leg.key)}>
+                        <XIcon className="size-4" />
+                        <span className="sr-only">Quitar destino</span>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              <Button type="button" variant="outline" size="sm" className="sm:col-span-2 justify-self-start" onClick={addLeg}>
+                <PlusIcon />
+                Agregar destino
+              </Button>
+
               <div className="flex flex-col gap-2">
                 <Label>Programa</Label>
                 <Select value={programId} onValueChange={setProgramId} disabled={programs.length === 0}>
@@ -215,6 +285,15 @@ export default function NewTripPage() {
                   placeholder="N° de alumnos"
                   value={form.studentCount}
                   onChange={(e) => setForm((p) => ({ ...p, studentCount: e.target.value }))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="hotel">Hotel (opcional)</Label>
+                <Input
+                  id="hotel"
+                  placeholder="Hotel"
+                  value={form.hotel}
+                  onChange={(e) => setForm((p) => ({ ...p, hotel: e.target.value }))}
                 />
               </div>
 

@@ -17,6 +17,9 @@ export const DELETE = withApiHandler<{ tripId: string; membershipId: string }>(a
   if (membership.role === Role.MONITOR && callerRole !== 'ADMIN') {
     throw new ApiError('FORBIDDEN', 'Only admins can remove a monitor from a trip.')
   }
+  if (membership.role === Role.STUDENT && callerRole !== 'ADMIN') {
+    throw new ApiError('FORBIDDEN', 'Only admins can remove a student from a trip.')
+  }
   if (membership.role === Role.PARENT && callerRole !== 'ADMIN' && callerRole !== 'MONITOR') {
     throw new ApiError('FORBIDDEN', 'You do not have permission to remove this member.')
   }

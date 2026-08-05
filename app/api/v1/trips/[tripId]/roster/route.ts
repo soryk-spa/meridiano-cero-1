@@ -15,7 +15,7 @@ export const GET = withApiHandler<{ tripId: string }>(async (_request, { params 
   }
 
   const memberships = await prisma.tripMembership.findMany({
-    where: { tripId, role: { in: [Role.PARENT, Role.MONITOR] } },
+    where: { tripId, role: { in: [Role.PARENT, Role.MONITOR, Role.STUDENT] } },
     orderBy: { createdAt: 'asc' },
   })
 
@@ -26,8 +26,9 @@ export const GET = withApiHandler<{ tripId: string }>(async (_request, { params 
   })
   const parents = memberships.filter((m) => m.role === Role.PARENT).map(toRow)
   const monitors = memberships.filter((m) => m.role === Role.MONITOR).map(toRow)
+  const students = memberships.filter((m) => m.role === Role.STUDENT).map(toRow)
 
-  return NextResponse.json({ parents, monitors })
+  return NextResponse.json({ parents, monitors, students })
 })
 
 const bodySchema = z.object({

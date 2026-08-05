@@ -31,7 +31,7 @@ import { FetchError } from '@/components/fetch-error'
 type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type TripOption = { id: string; name: string }
 
-const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor' }
+const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
 
 export default function AdminCodesPage() {
   const [codes, setCodes] = useState<CodeRow[] | null>(null)

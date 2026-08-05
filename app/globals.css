@@ -230,6 +230,13 @@ body {
   display: none;
 }
 
+/* Leaflet's own panes/controls use z-index up to 1000, which can float above
+   Sheet/Dialog overlays (z-50). Giving the container its own stacking context
+   confines all of that below any app-level overlay. */
+.leaflet-container {
+  z-index: 0;
+}
+
 @theme inline {
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);

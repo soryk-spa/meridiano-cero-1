@@ -11,6 +11,7 @@ datasource db {
 enum Role {
   PARENT
   MONITOR
+  STUDENT
 }
 
 enum TripStatus {
@@ -58,6 +59,7 @@ model Trip {
   studentCount Int
   initialLat   Float
   initialLng   Float
+  hotel        String?
   programId    String
   program      Program    @relation(fields: [programId], references: [id], onDelete: Restrict)
   createdAt    DateTime   @default(now())
@@ -67,6 +69,19 @@ model Trip {
   itineraryItems ItineraryItem[]
   announcements  Announcement[]
   locationPings  LocationPing[]
+  legs           TripLeg[]
+}
+
+model TripLeg {
+  id        String    @id @default(cuid())
+  tripId    String
+  trip      Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  order     Int
+  label     String
+  lat       Float
+  lng       Float
+  startDate DateTime?
+  endDate   DateTime?
 }
 
 model Program {

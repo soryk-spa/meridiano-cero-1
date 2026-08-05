@@ -1,14 +1,25 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { SearchIcon } from 'lucide-react'
 import type { TripStatus } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import StatusBadge from '@/components/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FetchError } from '@/components/fetch-error'
 import type { FleetMarker } from '@/components/FleetMapView'
+
+const ALL_SCHOOLS = 'all'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
 
@@ -34,6 +45,8 @@ export default function AdminMapPage() {
   const [fleet, setFleet] = useState<FleetTrip[] | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [schoolFilter, setSchoolFilter] = useState(ALL_SCHOOLS)
 
   const load = useCallback(async () => {
     setError(null)
@@ -53,6 +66,21 @@ export default function AdminMapPage() {
 
     return () => window.clearTimeout(id)
   }, [load])
+
+  const schoolOptions = useMemo(
+    () => Array.from(new Set((fleet ?? []).map((trip) => trip.school))).sort(),
+    [fleet]
+  )
+
+  const filteredFleet = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return (fleet ?? []).filter((trip) => {
+      const matchesSearch =
+        !query || trip.name.toLowerCase().includes(query) || trip.destination.toLowerCase().includes(query)
+      const matchesSchool = schoolFilter === ALL_SCHOOLS || trip.school === schoolFilter
+      return matchesSearch && matchesSchool
+    })
+  }, [fleet, search, schoolFilter])
 
   if (error && !fleet) {
     return (
@@ -74,7 +102,7 @@ export default function AdminMapPage() {
     )
   }
 
-  const markers: FleetMarker[] = fleet.map((trip) => ({
+  const markers: FleetMarker[] = filteredFleet.map((trip) => ({
     id: trip.id,
     lat: trip.ping?.lat ?? trip.initialLat,
     lng: trip.ping?.lng ?? trip.initialLng,
@@ -87,6 +115,30 @@ export default function AdminMapPage() {
     <>
       <SiteHeader title="Mapa operativo" subtitle="Giras en terreno en tiempo real" />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar gira o destino…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+            <SelectTrigger className="sm:w-56">
+              <SelectValue placeholder="Colegio" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_SCHOOLS}>Todos los colegios</SelectItem>
+              {schoolOptions.map((school) => (
+                <SelectItem key={school} value={school}>
+                  {school}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <Card className="overflow-hidden">
             {markers.length ? (
@@ -94,17 +146,17 @@ export default function AdminMapPage() {
                 markers={markers}
                 selectedId={selectedId}
                 onMarkerClick={setSelectedId}
-                height="calc(100vh - 180px)"
+                height="calc(100vh - 232px)"
               />
             ) : (
-              <CardContent className="flex h-[calc(100vh-180px)] items-center justify-center text-muted-foreground">
-                Sin giras en terreno actualmente.
+              <CardContent className="flex h-[calc(100vh-232px)] items-center justify-center text-muted-foreground">
+                {fleet && fleet.length > 0 ? 'Sin giras que coincidan con el filtro.' : 'Sin giras en terreno actualmente.'}
               </CardContent>
             )}
           </Card>
           <Card className="overflow-hidden">
-            <CardContent className="flex h-[calc(100vh-180px)] flex-col gap-1 overflow-y-auto p-2">
-              {fleet.map((trip) => (
+            <CardContent className="flex h-[calc(100vh-232px)] flex-col gap-1 overflow-y-auto p-2">
+              {filteredFleet.map((trip) => (
                 <button
                   key={trip.id}
                   onClick={() => setSelectedId(trip.id)}
@@ -126,8 +178,10 @@ export default function AdminMapPage() {
                   )}
                 </button>
               ))}
-              {fleet.length === 0 ? (
-                <p className="p-3 text-sm text-muted-foreground">Sin giras en terreno actualmente.</p>
+              {filteredFleet.length === 0 ? (
+                <p className="p-3 text-sm text-muted-foreground">
+                  {fleet && fleet.length > 0 ? 'Sin giras que coincidan con el filtro.' : 'Sin giras en terreno actualmente.'}
+                </p>
               ) : null}
             </CardContent>
           </Card>
