@@ -16,7 +16,8 @@ import {
   UserPlusIcon,
   UsersIcon,
 } from 'lucide-react'
-import { differenceInCalendarDays } from 'date-fns'
+import { addDays, differenceInCalendarDays, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
 import type { DateRange } from 'react-day-picker'
 import type {
@@ -69,8 +70,12 @@ type MonitorRow = { id: string; name: string; email: string }
 type StudentRow = { id: string; name: string; email: string }
 type ProgramOption = { id: string; name: string }
 
-const STATUS_OPTIONS: TripStatus[] = ['IN_TRANSIT', 'IN_ACTIVITY', 'RESTING', 'FINISHED']
+const STATUS_OPTIONS: TripStatus[] = ['IN_ACTIVITY', 'RESTING', 'FINISHED']
 const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
+
+function dayDate(startDate: string | Date, dayNumber: number) {
+  return addDays(new Date(startDate), dayNumber - 1)
+}
 
 const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '', hotel: '' }
 const EMPTY_MONITOR_FORM = { firstName: '', lastName: '', emailAddress: '' }
@@ -79,6 +84,7 @@ export default function AdminTripDetailPage() {
   const { tripId } = useParams<{ tripId: string }>()
   const searchParams = useSearchParams()
   const autoEditTriggered = useRef(false)
+  const [activeTab, setActiveTab] = useState('resumen')
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
@@ -458,6 +464,9 @@ export default function AdminTripDetailPage() {
     )
   }
 
+  const currentActivity = itinerary.find((item) => item.status !== 'COMPLETED')
+  const completedActivityCount = itinerary.filter((item) => item.status === 'COMPLETED').length
+
   return (
     <>
       <SiteHeader
@@ -536,7 +545,7 @@ export default function AdminTripDetailPage() {
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <Tabs defaultValue="resumen">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="resumen">Resumen</TabsTrigger>
             <TabsTrigger value="itinerario">Itinerario</TabsTrigger>
@@ -577,7 +586,9 @@ export default function AdminTripDetailPage() {
             <CardContent>
               <p className="text-lg font-semibold">{trip.destination}</p>
               <p className="text-sm text-muted-foreground">
-                Día {trip.currentDay} de {trip.totalDays}
+                {format(new Date(trip.startDate), 'd MMM', { locale: es })}–
+                {format(new Date(trip.endDate), 'd MMM', { locale: es })} · Día {trip.currentDay} de{' '}
+                {trip.totalDays}
               </p>
             </CardContent>
           </Card>
@@ -588,6 +599,54 @@ export default function AdminTripDetailPage() {
             <CardContent>
               <p className="text-lg font-semibold">{trip.studentCount}</p>
               <p className="text-sm text-muted-foreground">{trip.school.name}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm text-muted-foreground">Actividad actual</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              {currentActivity ? (
+                <>
+                  <p className="text-sm font-semibold">{currentActivity.title}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Día {currentActivity.dayNumber} · {currentActivity.time} · {currentActivity.location}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin actividades pendientes.</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {completedActivityCount}/{itinerary.length} actividades completadas
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {monitors.map((m) => m.name).join(', ') || 'Sin monitores asignados'}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-sm text-muted-foreground">Último comunicado</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setActiveTab('comunicados')}>
+                Ver todos
+              </Button>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-1">
+              {announcements[0] ? (
+                <>
+                  <p className="text-sm font-semibold">{announcements[0].title}</p>
+                  <p className="line-clamp-2 text-sm text-muted-foreground">{announcements[0].message}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {announcements[0].authorName} ·{' '}
+                    {format(new Date(announcements[0].createdAt), 'd MMM, HH:mm', { locale: es })}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">Sin comunicados todavía.</p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -682,7 +741,7 @@ export default function AdminTripDetailPage() {
                   .map(([day, items]) => (
                     <div key={day} className="flex flex-col gap-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Día {day}
+                        Día {day} · {format(dayDate(trip.startDate, Number(day)), 'd MMM', { locale: es })}
                       </p>
                       {items.map((item) => (
                         <div
@@ -1006,6 +1065,15 @@ export default function AdminTripDetailPage() {
               >
                 <UserPlusIcon />
                 {addingRole === 'PARENT' ? 'Agregando…' : 'Agregar apoderado'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleAddCode('STUDENT')}
+                disabled={addingRole !== null}
+              >
+                <UserPlusIcon />
+                {addingRole === 'STUDENT' ? 'Agregando…' : 'Agregar alumno'}
               </Button>
             </div>
           </CardHeader>

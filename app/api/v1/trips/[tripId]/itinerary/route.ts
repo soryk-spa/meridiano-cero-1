@@ -25,7 +25,7 @@ const bodySchema = z.object({
   location: z.string().trim().min(1),
   description: z.string().trim().min(1),
   order: z.number().int().nonnegative().optional(),
-  requirementsMessage: z.string().trim().min(1).optional(),
+  requirementsMessage: z.string().trim().min(1).nullable().optional(),
 })
 
 export const POST = withApiHandler<{ tripId: string }>(async (request, { params }) => {

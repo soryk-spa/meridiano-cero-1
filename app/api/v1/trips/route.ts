@@ -39,7 +39,7 @@ export const GET = withApiHandler(async () => {
 const bodySchema = z
   .object({
     name: z.string().trim().min(1),
-    schoolName: z.string().trim().min(1),
+    schoolId: z.string().trim().min(1),
     destination: z.string().trim().min(1),
     startDate: z.iso.datetime(),
     endDate: z.iso.datetime(),
@@ -72,7 +72,7 @@ export const POST = withApiHandler(async (request) => {
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'Missing or invalid trip fields.')
 
-  const { schoolName, parentCode, monitorCode, programId, legs, ...tripData } = parsed.data
+  const { schoolId, parentCode, monitorCode, programId, legs, ...tripData } = parsed.data
   const startDate = new Date(tripData.startDate)
   const endDate = new Date(tripData.endDate)
   const totalDays = differenceInCalendarDays(endDate, startDate) + 1
@@ -80,11 +80,8 @@ export const POST = withApiHandler(async (request) => {
   const program = await prisma.program.findUnique({ where: { id: programId } })
   if (!program) throw new ApiError('VALIDATION_ERROR', 'Program not found.')
 
-  const school = await prisma.school.upsert({
-    where: { name: schoolName },
-    update: {},
-    create: { name: schoolName },
-  })
+  const school = await prisma.school.findUnique({ where: { id: schoolId } })
+  if (!school) throw new ApiError('VALIDATION_ERROR', 'School not found.')
 
   const trip = await prisma.trip.create({
     data: {

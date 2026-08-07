@@ -14,14 +14,8 @@ import StatusBadge from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { MultiSelectFilter } from '@/components/multi-select-filter'
 import type { FleetMarker } from '@/components/FleetMapView'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
@@ -44,15 +38,12 @@ const STATUS_COLOR: Record<TripStatus, string> = {
   FINISHED: '#94a3b8',
 }
 
-const ALL_SCHOOLS = 'all'
-const ALL_DESTINATIONS = 'all'
-
 export default function AdminPage() {
   const [trips, setTrips] = useState<TripRow[]>([])
   const [fleet, setFleet] = useState<FleetTrip[] | null>(null)
   const [mapSearch, setMapSearch] = useState('')
-  const [mapSchoolFilter, setMapSchoolFilter] = useState(ALL_SCHOOLS)
-  const [mapDestinationFilter, setMapDestinationFilter] = useState(ALL_DESTINATIONS)
+  const [mapSchoolFilter, setMapSchoolFilter] = useState<string[]>([])
+  const [mapDestinationFilter, setMapDestinationFilter] = useState<string[]>([])
 
   useEffect(() => {
     const id = window.setTimeout(async () => {
@@ -93,8 +84,8 @@ export default function AdminPage() {
     return (fleet ?? []).filter((trip) => {
       const matchesSearch =
         !query || trip.name.toLowerCase().includes(query) || trip.destination.toLowerCase().includes(query)
-      const matchesSchool = mapSchoolFilter === ALL_SCHOOLS || trip.school === mapSchoolFilter
-      const matchesDestination = mapDestinationFilter === ALL_DESTINATIONS || trip.destination === mapDestinationFilter
+      const matchesSchool = mapSchoolFilter.length === 0 || mapSchoolFilter.includes(trip.school)
+      const matchesDestination = mapDestinationFilter.length === 0 || mapDestinationFilter.includes(trip.destination)
       return matchesSearch && matchesSchool && matchesDestination
     })
   }, [fleet, mapSearch, mapSchoolFilter, mapDestinationFilter])
@@ -142,32 +133,20 @@ export default function AdminPage() {
                         className="pl-8"
                       />
                     </div>
-                    <Select value={mapSchoolFilter} onValueChange={setMapSchoolFilter}>
-                      <SelectTrigger className="sm:w-48">
-                        <SelectValue placeholder="Colegio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_SCHOOLS}>Todos los colegios</SelectItem>
-                        {mapSchoolOptions.map((school) => (
-                          <SelectItem key={school} value={school}>
-                            {school}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Select value={mapDestinationFilter} onValueChange={setMapDestinationFilter}>
-                      <SelectTrigger className="sm:w-48">
-                        <SelectValue placeholder="Destino" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={ALL_DESTINATIONS}>Todos los destinos</SelectItem>
-                        {mapDestinationOptions.map((destination) => (
-                          <SelectItem key={destination} value={destination}>
-                            {destination}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <MultiSelectFilter
+                      options={mapSchoolOptions}
+                      selected={mapSchoolFilter}
+                      onChange={setMapSchoolFilter}
+                      placeholder="Colegio"
+                      className="sm:w-48"
+                    />
+                    <MultiSelectFilter
+                      options={mapDestinationOptions}
+                      selected={mapDestinationFilter}
+                      onChange={setMapDestinationFilter}
+                      placeholder="Destino"
+                      className="sm:w-48"
+                    />
                   </div>
                   {markers.length ? (
                     <FleetMapView markers={markers} height="380px" />

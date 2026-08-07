@@ -33,6 +33,11 @@ export const POST = withApiHandler<{ tripId: string; itemId: string }>(async (re
     data: { photoUrl: blob.url },
   })
 
+  const trip = await prisma.trip.findUnique({ where: { id: tripId }, select: { status: true } })
+  if (trip && trip.status !== 'FINISHED' && trip.status !== 'IN_ACTIVITY') {
+    await prisma.trip.update({ where: { id: tripId }, data: { status: 'IN_ACTIVITY' } })
+  }
+
   return NextResponse.json({ item: updated }, { status: 201 })
 })
 

@@ -1,10 +1,16 @@
 'use client'
 
+import { addDays, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { CheckCircle2, Circle, Clock3, MapPin } from 'lucide-react'
 import { useTripContext } from '@/lib/trip-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import type { ItineraryItem } from '@prisma/client'
+
+function dayDate(startDate: string | Date, dayNumber: number) {
+  return addDays(new Date(startDate), dayNumber - 1)
+}
 
 function TimelineItem({ item, isLast }: { item: ItineraryItem; isLast: boolean }) {
   const done = item.status === 'COMPLETED'
@@ -129,7 +135,7 @@ export default function ItineraryPage() {
               .map(([day, dayItems]) => (
                 <div key={day}>
                   <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Día {day}
+                    Día {day} · {format(dayDate(trip.startDate, Number(day)), 'd MMM', { locale: es })}
                   </p>
                   {dayItems.map((item, i) => (
                     <TimelineItem key={item.id} item={item} isLast={i === dayItems.length - 1} />

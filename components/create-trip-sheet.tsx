@@ -6,6 +6,7 @@ import { differenceInCalendarDays } from "date-fns"
 import type { DateRange } from "react-day-picker"
 
 import { Button } from "@/components/ui/button"
+import { Combobox } from "@/components/ui/combobox"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,11 +33,11 @@ import { generateAccessCode } from "@/lib/generate-code"
 const CUSTOM_DESTINATION = "custom"
 
 type ProgramOption = { id: string; name: string }
+type SchoolOption = { id: string; name: string }
 type ExtraLeg = { key: string; destinationId: string }
 
 const EMPTY_FORM = {
   name: "",
-  schoolName: "",
   destination: "",
   studentCount: "",
   initialLat: "",
@@ -54,6 +55,8 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
   const [submitting, setSubmitting] = useState(false)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
   const [programId, setProgramId] = useState("")
+  const [schools, setSchools] = useState<SchoolOption[]>([])
+  const [schoolId, setSchoolId] = useState("")
   const [extraLegs, setExtraLegs] = useState<ExtraLeg[]>([])
   const legKeyCounter = useRef(0)
 
@@ -61,7 +64,23 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
     fetch("/api/v1/admin/programs")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setPrograms(data.programs))
+    fetch("/api/v1/admin/schools")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => data && setSchools(data.schools))
   }, [])
+
+  async function handleCreateSchool(name: string) {
+    const res = await fetch("/api/v1/admin/schools", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+    if (res.ok) {
+      const { school } = await res.json()
+      setSchools((p) => [...p, school])
+      setSchoolId(school.id)
+    }
+  }
 
   const isCustomDestination = destinationId === CUSTOM_DESTINATION
   const totalDays =
@@ -106,6 +125,7 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
     setDestinationId("")
     setDateRange(undefined)
     setProgramId("")
+    setSchoolId("")
     setExtraLegs([])
   }
 
@@ -124,6 +144,7 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
+        schoolId,
         startDate: dateRange.from.toISOString(),
         endDate: dateRange.to.toISOString(),
         studentCount: Number(form.studentCount),
@@ -150,7 +171,8 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
     form.destination.trim() &&
     form.initialLat !== "" &&
     form.initialLng !== "" &&
-    !!programId
+    !!programId &&
+    !!schoolId
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -179,12 +201,14 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="schoolName">Colegio</Label>
-              <Input
-                id="schoolName"
-                placeholder="Colegio"
-                value={form.schoolName}
-                onChange={(e) => setForm((p) => ({ ...p, schoolName: e.target.value }))}
+              <Label>Colegio</Label>
+              <Combobox
+                options={schools.map((s) => ({ value: s.id, label: s.name }))}
+                value={schoolId || null}
+                onSelect={(v) => setSchoolId(v ?? "")}
+                placeholder="Elegir o crear un colegio…"
+                emptyLabel="Sin colegios registrados."
+                onCreate={handleCreateSchool}
               />
             </div>
 

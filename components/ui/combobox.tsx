@@ -23,6 +23,8 @@ export function Combobox({
   placeholder = 'Buscar…',
   emptyLabel = 'Sin resultados.',
   className,
+  onCreate,
+  createLabel = (query: string) => `Crear "${query}"`,
 }: {
   options: ComboboxOption[]
   value: string | null
@@ -30,9 +32,17 @@ export function Combobox({
   placeholder?: string
   emptyLabel?: string
   className?: string
+  onCreate?: (query: string) => void
+  createLabel?: (query: string) => string
 }) {
   const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const selected = options.find((option) => option.value === value)
+  const trimmedQuery = query.trim()
+  const showCreate =
+    !!onCreate &&
+    !!trimmedQuery &&
+    !options.some((option) => option.label.toLowerCase() === trimmedQuery.toLowerCase())
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -53,7 +63,7 @@ export function Combobox({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
         <Command>
-          <CommandInput placeholder={placeholder} />
+          <CommandInput placeholder={placeholder} value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>{emptyLabel}</CommandEmpty>
             <CommandGroup>
@@ -63,6 +73,7 @@ export function Combobox({
                   value={option.label}
                   onSelect={() => {
                     onSelect(option.value === value ? null : option.value)
+                    setQuery('')
                     setOpen(false)
                   }}
                 >
@@ -75,6 +86,18 @@ export function Combobox({
                   </div>
                 </CommandItem>
               ))}
+              {showCreate ? (
+                <CommandItem
+                  value={`__create__${trimmedQuery}`}
+                  onSelect={() => {
+                    onCreate?.(trimmedQuery)
+                    setQuery('')
+                    setOpen(false)
+                  }}
+                >
+                  {createLabel(trimmedQuery)}
+                </CommandItem>
+              ) : null}
             </CommandGroup>
           </CommandList>
         </Command>

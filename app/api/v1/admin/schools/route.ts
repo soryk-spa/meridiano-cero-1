@@ -36,7 +36,9 @@ export const POST = withApiHandler(async (request) => {
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'A school name is required.')
 
-  const existing = await prisma.school.findFirst({ where: { name: parsed.data.name } })
+  const existing = await prisma.school.findFirst({
+    where: { name: { equals: parsed.data.name, mode: 'insensitive' } },
+  })
   if (existing) throw new ApiError('VALIDATION_ERROR', 'A school with that name already exists.')
 
   const school = await prisma.school.create({ data: { name: parsed.data.name } })

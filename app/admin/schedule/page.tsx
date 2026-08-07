@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { addDays, differenceInCalendarDays, eachDayOfInterval, format, isSameDay } from 'date-fns'
+import { addDays, eachDayOfInterval, format, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { LayoutGridIcon, SearchIcon } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
@@ -32,24 +32,14 @@ type ScheduleTrip = {
   hotel: string | null
   startDate: string
   endDate: string
+  currentDay: number
+  totalDays: number
   itineraryItems: { dayNumber: number; time: string; title: string }[]
 }
 
 const ALL_SCHOOLS = 'all'
 const ALL_DESTINATIONS = 'all'
 const MAX_RANGE_DAYS = 62
-
-/** Validated 8-slot categorical palette (light/dark steps) — never cycled past 8, see docs/SISTEMA.md dataviz notes. */
-const SLOT_DOT_CLASSES = [
-  'bg-[#2a78d6] dark:bg-[#3987e5]',
-  'bg-[#eb6834] dark:bg-[#d95926]',
-  'bg-[#1baf7a] dark:bg-[#199e70]',
-  'bg-[#eda100] dark:bg-[#c98500]',
-  'bg-[#e87ba4] dark:bg-[#d55181]',
-  'bg-[#008300] dark:bg-[#008300]',
-  'bg-[#4a3aa7] dark:bg-[#9085e9]',
-  'bg-[#e34948] dark:bg-[#e66767]',
-]
 
 function itemDate(trip: ScheduleTrip, dayNumber: number) {
   return addDays(new Date(trip.startDate), dayNumber - 1)
@@ -69,10 +59,6 @@ export default function AdminSchedulePage() {
   const [schoolFilter, setSchoolFilter] = useState(ALL_SCHOOLS)
   const [destinationFilter, setDestinationFilter] = useState(ALL_DESTINATIONS)
 
-  const rangeDays =
-    dateRange?.from && dateRange?.to ? differenceInCalendarDays(dateRange.to, dateRange.from) + 1 : 0
-  const rangeTooLarge = rangeDays > MAX_RANGE_DAYS
-
   const load = useCallback(async (from: Date, to: Date) => {
     setTrips(null)
     setLoadError(null)
@@ -87,12 +73,12 @@ export default function AdminSchedulePage() {
   }, [])
 
   useEffect(() => {
-    if (!dateRange?.from || !dateRange?.to || rangeTooLarge) return
+    if (!dateRange?.from || !dateRange?.to) return
     const from = dateRange.from
     const to = dateRange.to
     const id = window.setTimeout(() => void load(from, to), 0)
     return () => window.clearTimeout(id)
-  }, [dateRange, rangeTooLarge, load])
+  }, [dateRange, load])
 
   const schoolOptions = useMemo(
     () => Array.from(new Set((trips ?? []).map((trip) => trip.school.name))).sort(),
@@ -113,22 +99,13 @@ export default function AdminSchedulePage() {
     })
   }, [trips, search, schoolFilter, destinationFilter])
 
-  const days = useMemo(
-    () => (dateRange?.from && dateRange?.to ? eachDayOfInterval({ start: dateRange.from, end: dateRange.to }) : []),
-    [dateRange]
-  )
-
-  const slotByTitle = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const trip of filteredTrips) {
-      for (const item of [...trip.itineraryItems].sort((a, b) => a.dayNumber - b.dayNumber)) {
-        if (!map.has(item.title) && map.size < SLOT_DOT_CLASSES.length) {
-          map.set(item.title, map.size)
-        }
-      }
-    }
-    return map
+  const days = useMemo(() => {
+    if (!filteredTrips.length) return []
+    const starts = filteredTrips.map((trip) => new Date(trip.startDate).getTime())
+    const ends = filteredTrips.map((trip) => new Date(trip.endDate).getTime())
+    return eachDayOfInterval({ start: new Date(Math.min(...starts)), end: new Date(Math.max(...ends)) })
   }, [filteredTrips])
+  const spanTooLarge = days.length > MAX_RANGE_DAYS
 
   return (
     <>
@@ -172,30 +149,19 @@ export default function AdminSchedulePage() {
           </div>
         </div>
 
-        {slotByTitle.size ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {Array.from(slotByTitle.entries()).map(([title, slot]) => (
-              <span key={title} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={`size-2.5 shrink-0 rounded-full ${SLOT_DOT_CLASSES[slot]}`} />
-                {title}
-              </span>
-            ))}
-          </div>
-        ) : null}
-
-        {rangeTooLarge ? (
-          <EmptyState
-            icon={LayoutGridIcon}
-            title="Rango de fechas muy amplio."
-            description={`Elige un rango de ${MAX_RANGE_DAYS} días o menos para ver el detalle día por día.`}
-          />
-        ) : loadError && !trips ? (
+        {loadError && !trips ? (
           <FetchError
             message={loadError}
             onRetry={() => dateRange?.from && dateRange?.to && void load(dateRange.from, dateRange.to)}
           />
         ) : !trips ? (
           <Skeleton className="h-96 w-full" />
+        ) : spanTooLarge ? (
+          <EmptyState
+            icon={LayoutGridIcon}
+            title="Las giras visibles abarcan un rango muy amplio."
+            description={`Achica los filtros o el rango de fechas para ver el detalle día por día (máximo ${MAX_RANGE_DAYS} días).`}
+          />
         ) : filteredTrips.length ? (
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -225,6 +191,9 @@ export default function AdminSchedulePage() {
                           <Link href={`/admin/trips/${trip.id}`} className="hover:underline">
                             {trip.name}
                           </Link>
+                          <p className="text-xs font-normal text-muted-foreground">
+                            Día {trip.currentDay} de {trip.totalDays}
+                          </p>
                         </TableCell>
                         <TableCell className="text-muted-foreground">{trip.school.name}</TableCell>
                         <TableCell className="text-muted-foreground">{trip.program.name}</TableCell>
@@ -240,17 +209,14 @@ export default function AdminSchedulePage() {
                           const dayItems = trip.itineraryItems.filter((item) => isSameDay(itemDate(trip, item.dayNumber), day))
                           return (
                             <TableCell key={day.toISOString()} className="min-w-32 text-xs">
-                              {dayItems.map((item) => {
-                                const slot = slotByTitle.get(item.title)
-                                return (
-                                  <span key={item.title} className="flex items-center gap-1.5">
-                                    {slot !== undefined ? (
-                                      <span className={`size-1.5 shrink-0 rounded-full ${SLOT_DOT_CLASSES[slot]}`} />
-                                    ) : null}
+                              {dayItems.map((item) => (
+                                <span key={item.title} className="flex items-start gap-1.5">
+                                  <span className="text-muted-foreground">–</span>
+                                  <span>
                                     {item.title} <span className="text-muted-foreground">({item.time})</span>
                                   </span>
-                                )
-                              })}
+                                </span>
+                              ))}
                             </TableCell>
                           )
                         })}

@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { addDays, format } from 'date-fns'
+import { es } from 'date-fns/locale'
 import { Clock, ChevronRight, Calendar, Bell, Navigation, MapPin } from 'lucide-react'
 import { useTripContext } from '@/lib/trip-context'
 import StatusBadge from '@/components/StatusBadge'
@@ -9,6 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
+
+function dayDate(startDate: string | Date, dayNumber: number) {
+  return addDays(new Date(startDate), dayNumber - 1)
+}
 
 function timeAgo(date: Date): string {
   const diff = Math.floor((Date.now() - date.getTime()) / 1000)
@@ -37,7 +43,8 @@ export default function ParentHome() {
         <div className="flex items-center gap-3">
           <StatusBadge status={trip.status} />
           <span className="text-base text-muted-foreground">
-            Día {trip.currentDay} de {trip.totalDays}
+            Día {trip.currentDay} de {trip.totalDays} ·{' '}
+            {format(dayDate(trip.startDate, trip.currentDay), 'd MMM', { locale: es })}
           </span>
         </div>
       </div>

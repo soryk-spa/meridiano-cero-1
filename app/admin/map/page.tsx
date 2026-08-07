@@ -8,19 +8,10 @@ import { SiteHeader } from '@/components/site-header'
 import StatusBadge from '@/components/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FetchError } from '@/components/fetch-error'
+import { MultiSelectFilter } from '@/components/multi-select-filter'
 import type { FleetMarker } from '@/components/FleetMapView'
-
-const ALL_SCHOOLS = 'all'
-const ALL_DESTINATIONS = 'all'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
 
@@ -47,8 +38,8 @@ export default function AdminMapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [schoolFilter, setSchoolFilter] = useState(ALL_SCHOOLS)
-  const [destinationFilter, setDestinationFilter] = useState(ALL_DESTINATIONS)
+  const [schoolFilter, setSchoolFilter] = useState<string[]>([])
+  const [destinationFilter, setDestinationFilter] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setError(null)
@@ -83,8 +74,8 @@ export default function AdminMapPage() {
     return (fleet ?? []).filter((trip) => {
       const matchesSearch =
         !query || trip.name.toLowerCase().includes(query) || trip.destination.toLowerCase().includes(query)
-      const matchesSchool = schoolFilter === ALL_SCHOOLS || trip.school === schoolFilter
-      const matchesDestination = destinationFilter === ALL_DESTINATIONS || trip.destination === destinationFilter
+      const matchesSchool = schoolFilter.length === 0 || schoolFilter.includes(trip.school)
+      const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(trip.destination)
       return matchesSearch && matchesSchool && matchesDestination
     })
   }, [fleet, search, schoolFilter, destinationFilter])
@@ -132,32 +123,20 @@ export default function AdminMapPage() {
               className="pl-8"
             />
           </div>
-          <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-            <SelectTrigger className="sm:w-56">
-              <SelectValue placeholder="Colegio" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_SCHOOLS}>Todos los colegios</SelectItem>
-              {schoolOptions.map((school) => (
-                <SelectItem key={school} value={school}>
-                  {school}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={destinationFilter} onValueChange={setDestinationFilter}>
-            <SelectTrigger className="sm:w-56">
-              <SelectValue placeholder="Destino" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_DESTINATIONS}>Todos los destinos</SelectItem>
-              {destinationOptions.map((destination) => (
-                <SelectItem key={destination} value={destination}>
-                  {destination}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            options={schoolOptions}
+            selected={schoolFilter}
+            onChange={setSchoolFilter}
+            placeholder="Colegio"
+            className="sm:w-56"
+          />
+          <MultiSelectFilter
+            options={destinationOptions}
+            selected={destinationFilter}
+            onChange={setDestinationFilter}
+            placeholder="Destino"
+            className="sm:w-56"
+          />
         </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <Card className="overflow-hidden">
