@@ -65,23 +65,36 @@ export function ActivityItemSheet({
   editingItem: ActivityItemEditing | null
   onSubmit: (values: ActivityItemValues, editingItemId: string | null) => Promise<{ ok: boolean; error?: string }>
 }) {
-  // Radix unmounts SheetContent's children on close, so this lazy initializer
-  // re-reads editingItem fresh on every open — no effect needed to "reset" it.
-  const [form, setForm] = useState(() =>
-    editingItem
-      ? {
-          dayNumber: String(editingItem.dayNumber),
-          time: editingItem.time,
-          title: editingItem.title,
-          location: editingItem.location,
-          description: editingItem.description,
-          requirementsMessage: editingItem.requirementsMessage ?? '',
-        }
-      : EMPTY_FORM
-  )
+  const [form, setForm] = useState(EMPTY_FORM)
   const [selectedActivityTemplateId, setSelectedActivityTemplateId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // ActivityItemSheet itself never unmounts (only its `open` prop toggles), so the
+  // form has to be synced explicitly whenever the sheet opens — a lazy useState
+  // initializer only runs once, on ActivityItemSheet's own first mount. Adjusting
+  // state during render (rather than in an effect) avoids an extra post-paint
+  // render pass — see https://react.dev/learn/you-might-not-need-an-effect.
+  const [prevOpen, setPrevOpen] = useState(open)
+  if (open !== prevOpen) {
+    setPrevOpen(open)
+    if (open) {
+      setForm(
+        editingItem
+          ? {
+              dayNumber: String(editingItem.dayNumber),
+              time: editingItem.time,
+              title: editingItem.title,
+              location: editingItem.location,
+              description: editingItem.description,
+              requirementsMessage: editingItem.requirementsMessage ?? '',
+            }
+          : EMPTY_FORM
+      )
+      setSelectedActivityTemplateId(null)
+      setError(null)
+    }
+  }
 
   function handleSelectActivityTemplate(id: string | null) {
     setSelectedActivityTemplateId(id)
