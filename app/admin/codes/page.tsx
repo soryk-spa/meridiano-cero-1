@@ -97,7 +97,7 @@ export default function AdminCodesPage() {
     <>
       <SiteHeader
         title="Códigos"
-        subtitle="Códigos de acceso para apoderados y monitores"
+        subtitle="Códigos de acceso para apoderados, monitores y alumnos"
         right={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -135,6 +135,7 @@ export default function AdminCodesPage() {
                     <SelectContent>
                       <SelectItem value="PARENT">Apoderado</SelectItem>
                       <SelectItem value="MONITOR">Monitor</SelectItem>
+                      <SelectItem value="STUDENT">Alumno</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

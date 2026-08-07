@@ -20,6 +20,7 @@ import { FetchError } from '@/components/fetch-error'
 import type { FleetMarker } from '@/components/FleetMapView'
 
 const ALL_SCHOOLS = 'all'
+const ALL_DESTINATIONS = 'all'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
 
@@ -47,6 +48,7 @@ export default function AdminMapPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [schoolFilter, setSchoolFilter] = useState(ALL_SCHOOLS)
+  const [destinationFilter, setDestinationFilter] = useState(ALL_DESTINATIONS)
 
   const load = useCallback(async () => {
     setError(null)
@@ -71,6 +73,10 @@ export default function AdminMapPage() {
     () => Array.from(new Set((fleet ?? []).map((trip) => trip.school))).sort(),
     [fleet]
   )
+  const destinationOptions = useMemo(
+    () => Array.from(new Set((fleet ?? []).map((trip) => trip.destination))).sort(),
+    [fleet]
+  )
 
   const filteredFleet = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -78,9 +84,10 @@ export default function AdminMapPage() {
       const matchesSearch =
         !query || trip.name.toLowerCase().includes(query) || trip.destination.toLowerCase().includes(query)
       const matchesSchool = schoolFilter === ALL_SCHOOLS || trip.school === schoolFilter
-      return matchesSearch && matchesSchool
+      const matchesDestination = destinationFilter === ALL_DESTINATIONS || trip.destination === destinationFilter
+      return matchesSearch && matchesSchool && matchesDestination
     })
-  }, [fleet, search, schoolFilter])
+  }, [fleet, search, schoolFilter, destinationFilter])
 
   if (error && !fleet) {
     return (
@@ -134,6 +141,19 @@ export default function AdminMapPage() {
               {schoolOptions.map((school) => (
                 <SelectItem key={school} value={school}>
                   {school}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+            <SelectTrigger className="sm:w-56">
+              <SelectValue placeholder="Destino" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_DESTINATIONS}>Todos los destinos</SelectItem>
+              {destinationOptions.map((destination) => (
+                <SelectItem key={destination} value={destination}>
+                  {destination}
                 </SelectItem>
               ))}
             </SelectContent>

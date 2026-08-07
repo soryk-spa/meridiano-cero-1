@@ -4,16 +4,7 @@ import { ApiError } from '@/lib/api/errors'
 import { requireAdmin } from '@/lib/api/require-role'
 import { withApiHandler } from '@/lib/api/handler'
 
-/** Grants admin access directly to an already-registered user, no invitation needed. */
-export const POST = withApiHandler<{ clerkUserId: string }>(async (_request, { params }) => {
-  await requireAdmin()
-  const { clerkUserId } = await params
-
-  await prisma.adminUser.upsert({ where: { clerkUserId }, update: {}, create: { clerkUserId } })
-
-  return NextResponse.json({ ok: true })
-})
-
+/** Revokes admin access. Granting it is deliberately invite-only (see /api/v1/admin/team/invite). */
 export const DELETE = withApiHandler<{ clerkUserId: string }>(async (_request, { params }) => {
   const { clerkUserId: currentUserId } = await requireAdmin()
   const { clerkUserId } = await params

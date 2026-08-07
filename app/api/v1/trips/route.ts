@@ -7,16 +7,33 @@ import { ApiError } from '@/lib/api/errors'
 import { requireAdmin } from '@/lib/api/require-role'
 import { withApiHandler } from '@/lib/api/handler'
 import { applyProgramToTrip } from '@/lib/api/programs'
+import { describeUsers } from '@/lib/api/clerk-users'
 
 export const GET = withApiHandler(async () => {
   await requireAdmin()
 
   const trips = await prisma.trip.findMany({
-    include: { school: { select: { name: true } }, accessCodes: true },
+    include: {
+      school: { select: { name: true } },
+      accessCodes: true,
+      memberships: { where: { role: Role.MONITOR }, select: { clerkUserId: true } },
+      itineraryItems: {
+        select: { dayNumber: true, title: true, status: true },
+        orderBy: [{ dayNumber: 'asc' }, { order: 'asc' }],
+      },
+    },
     orderBy: { createdAt: 'desc' },
   })
 
-  return NextResponse.json({ trips })
+  const monitorIds = trips.flatMap((trip) => trip.memberships.map((m) => m.clerkUserId))
+  const users = await describeUsers(monitorIds)
+
+  const result = trips.map(({ memberships, ...trip }) => ({
+    ...trip,
+    monitorNames: memberships.map((m) => users.get(m.clerkUserId)?.name).filter((n): n is string => !!n),
+  }))
+
+  return NextResponse.json({ trips: result })
 })
 
 const bodySchema = z

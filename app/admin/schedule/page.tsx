@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { addDays, addMonths, eachDayOfInterval, endOfMonth, format, isSameDay, startOfMonth, subMonths } from 'date-fns'
+import { addDays, differenceInCalendarDays, eachDayOfInterval, format, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ChevronLeftIcon, ChevronRightIcon, LayoutGridIcon, SearchIcon } from 'lucide-react'
+import { LayoutGridIcon, SearchIcon } from 'lucide-react'
+import type { DateRange } from 'react-day-picker'
 import { SiteHeader } from '@/components/site-header'
+import { DateRangePicker } from '@/components/date-range-picker'
 import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
@@ -24,16 +25,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 type ScheduleTrip = {
   id: string
   name: string
+  destination: string
   school: { name: string }
   program: { name: string }
   studentCount: number
   hotel: string | null
   startDate: string
   endDate: string
-  itineraryItems: { dayNumber: number; title: string }[]
+  itineraryItems: { dayNumber: number; time: string; title: string }[]
 }
 
 const ALL_SCHOOLS = 'all'
+const ALL_DESTINATIONS = 'all'
+const MAX_RANGE_DAYS = 62
 
 /** Validated 8-slot categorical palette (light/dark steps) — never cycled past 8, see docs/SISTEMA.md dataviz notes. */
 const SLOT_DOT_CLASSES = [
@@ -51,17 +55,29 @@ function itemDate(trip: ScheduleTrip, dayNumber: number) {
   return addDays(new Date(trip.startDate), dayNumber - 1)
 }
 
+function defaultRange(): DateRange {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return { from: today, to: addDays(today, 20) }
+}
+
 export default function AdminSchedulePage() {
-  const [monthDate, setMonthDate] = useState(() => startOfMonth(new Date()))
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange)
   const [trips, setTrips] = useState<ScheduleTrip[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [schoolFilter, setSchoolFilter] = useState(ALL_SCHOOLS)
+  const [destinationFilter, setDestinationFilter] = useState(ALL_DESTINATIONS)
 
-  const load = useCallback(async (month: Date) => {
+  const rangeDays =
+    dateRange?.from && dateRange?.to ? differenceInCalendarDays(dateRange.to, dateRange.from) + 1 : 0
+  const rangeTooLarge = rangeDays > MAX_RANGE_DAYS
+
+  const load = useCallback(async (from: Date, to: Date) => {
     setTrips(null)
     setLoadError(null)
-    const res = await fetch(`/api/v1/admin/schedule?month=${format(month, 'yyyy-MM')}`)
+    const params = new URLSearchParams({ from: format(from, 'yyyy-MM-dd'), to: format(to, 'yyyy-MM-dd') })
+    const res = await fetch(`/api/v1/admin/schedule?${params}`)
     if (res.ok) {
       setTrips((await res.json()).trips)
     } else {
@@ -71,12 +87,19 @@ export default function AdminSchedulePage() {
   }, [])
 
   useEffect(() => {
-    const id = window.setTimeout(() => void load(monthDate), 0)
+    if (!dateRange?.from || !dateRange?.to || rangeTooLarge) return
+    const from = dateRange.from
+    const to = dateRange.to
+    const id = window.setTimeout(() => void load(from, to), 0)
     return () => window.clearTimeout(id)
-  }, [monthDate, load])
+  }, [dateRange, rangeTooLarge, load])
 
   const schoolOptions = useMemo(
     () => Array.from(new Set((trips ?? []).map((trip) => trip.school.name))).sort(),
+    [trips]
+  )
+  const destinationOptions = useMemo(
+    () => Array.from(new Set((trips ?? []).map((trip) => trip.destination))).sort(),
     [trips]
   )
 
@@ -85,11 +108,15 @@ export default function AdminSchedulePage() {
     return (trips ?? []).filter((trip) => {
       const matchesSearch = !query || trip.name.toLowerCase().includes(query)
       const matchesSchool = schoolFilter === ALL_SCHOOLS || trip.school.name === schoolFilter
-      return matchesSearch && matchesSchool
+      const matchesDestination = destinationFilter === ALL_DESTINATIONS || trip.destination === destinationFilter
+      return matchesSearch && matchesSchool && matchesDestination
     })
-  }, [trips, search, schoolFilter])
+  }, [trips, search, schoolFilter, destinationFilter])
 
-  const days = useMemo(() => eachDayOfInterval({ start: monthDate, end: endOfMonth(monthDate) }), [monthDate])
+  const days = useMemo(
+    () => (dateRange?.from && dateRange?.to ? eachDayOfInterval({ start: dateRange.from, end: dateRange.to }) : []),
+    [dateRange]
+  )
 
   const slotByTitle = useMemo(() => {
     const map = new Map<string, number>()
@@ -108,26 +135,16 @@ export default function AdminSchedulePage() {
       <SiteHeader title="Organizador" subtitle="Grilla de actividades por día" />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setMonthDate((d) => subMonths(d, 1))}>
-              <ChevronLeftIcon className="size-4" />
-              <span className="sr-only">Mes anterior</span>
-            </Button>
-            <span className="min-w-36 text-center text-sm font-semibold capitalize">
-              {format(monthDate, 'MMMM yyyy', { locale: es })}
-            </span>
-            <Button variant="outline" size="icon" onClick={() => setMonthDate((d) => addMonths(d, 1))}>
-              <ChevronRightIcon className="size-4" />
-              <span className="sr-only">Mes siguiente</span>
-            </Button>
+          <div className="sm:w-64">
+            <DateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative sm:w-56">
+            <div className="relative sm:w-48">
               <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
               <Input placeholder="Buscar gira…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
             </div>
             <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-              <SelectTrigger className="sm:w-52">
+              <SelectTrigger className="sm:w-44">
                 <SelectValue placeholder="Colegio" />
               </SelectTrigger>
               <SelectContent>
@@ -135,6 +152,19 @@ export default function AdminSchedulePage() {
                 {schoolOptions.map((school) => (
                   <SelectItem key={school} value={school}>
                     {school}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={destinationFilter} onValueChange={setDestinationFilter}>
+              <SelectTrigger className="sm:w-44">
+                <SelectValue placeholder="Destino" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_DESTINATIONS}>Todos los destinos</SelectItem>
+                {destinationOptions.map((destination) => (
+                  <SelectItem key={destination} value={destination}>
+                    {destination}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -153,8 +183,17 @@ export default function AdminSchedulePage() {
           </div>
         ) : null}
 
-        {loadError && !trips ? (
-          <FetchError message={loadError} onRetry={() => void load(monthDate)} />
+        {rangeTooLarge ? (
+          <EmptyState
+            icon={LayoutGridIcon}
+            title="Rango de fechas muy amplio."
+            description={`Elige un rango de ${MAX_RANGE_DAYS} días o menos para ver el detalle día por día.`}
+          />
+        ) : loadError && !trips ? (
+          <FetchError
+            message={loadError}
+            onRetry={() => dateRange?.from && dateRange?.to && void load(dateRange.from, dateRange.to)}
+          />
         ) : !trips ? (
           <Skeleton className="h-96 w-full" />
         ) : filteredTrips.length ? (
@@ -170,8 +209,8 @@ export default function AdminSchedulePage() {
                     <TableHead>Hotel</TableHead>
                     <TableHead>In-Out</TableHead>
                     {days.map((day) => (
-                      <TableHead key={day.toISOString()} className="text-center">
-                        {format(day, 'd')}
+                      <TableHead key={day.toISOString()} className="whitespace-nowrap text-center">
+                        {format(day, 'd MMM', { locale: es })}
                       </TableHead>
                     ))}
                   </TableRow>
@@ -200,7 +239,7 @@ export default function AdminSchedulePage() {
                           }
                           const dayItems = trip.itineraryItems.filter((item) => isSameDay(itemDate(trip, item.dayNumber), day))
                           return (
-                            <TableCell key={day.toISOString()} className="min-w-28 text-xs">
+                            <TableCell key={day.toISOString()} className="min-w-32 text-xs">
                               {dayItems.map((item) => {
                                 const slot = slotByTitle.get(item.title)
                                 return (
@@ -208,7 +247,7 @@ export default function AdminSchedulePage() {
                                     {slot !== undefined ? (
                                       <span className={`size-1.5 shrink-0 rounded-full ${SLOT_DOT_CLASSES[slot]}`} />
                                     ) : null}
-                                    {item.title}
+                                    {item.title} <span className="text-muted-foreground">({item.time})</span>
                                   </span>
                                 )
                               })}
@@ -225,8 +264,8 @@ export default function AdminSchedulePage() {
         ) : (
           <EmptyState
             icon={LayoutGridIcon}
-            title="Sin giras este mes."
-            description="Ajusta el mes o los filtros para ver otras giras."
+            title="Sin giras en este rango."
+            description="Ajusta las fechas o los filtros para ver otras giras."
           />
         )}
       </div>

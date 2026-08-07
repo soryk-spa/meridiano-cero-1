@@ -101,11 +101,9 @@ export default function AdminUsersPage() {
     setQuery(search.trim())
   }
 
-  async function handleToggleAdmin(user: UserRow) {
+  async function handleRevokeAdmin(user: UserRow) {
     setTogglingAdminId(user.clerkUserId)
-    const res = await fetch(`/api/v1/admin/team/${user.clerkUserId}`, {
-      method: user.isAdmin ? 'DELETE' : 'POST',
-    })
+    const res = await fetch(`/api/v1/admin/team/${user.clerkUserId}`, { method: 'DELETE' })
     setTogglingAdminId(null)
     if (res.ok) void load()
   }
@@ -230,15 +228,17 @@ export default function AdminUsersPage() {
 
                       <TableCell>
                         <div className="flex justify-end gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleAdmin(user)}
-                            disabled={togglingAdminId === user.clerkUserId}
-                          >
-                            <ShieldIcon />
-                            {user.isAdmin ? 'Quitar admin' : 'Hacer admin'}
-                          </Button>
+                          {user.isAdmin ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRevokeAdmin(user)}
+                              disabled={togglingAdminId === user.clerkUserId}
+                            >
+                              <ShieldIcon />
+                              Quitar admin
+                            </Button>
+                          ) : null}
                           <Dialog
                             open={assignOpen?.clerkUserId === user.clerkUserId}
                             onOpenChange={(open) => !open && setAssignOpen(null)}
@@ -278,6 +278,7 @@ export default function AdminUsersPage() {
                                     <SelectContent>
                                       <SelectItem value="PARENT">Apoderado</SelectItem>
                                       <SelectItem value="MONITOR">Monitor</SelectItem>
+                                      <SelectItem value="STUDENT">Alumno</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>

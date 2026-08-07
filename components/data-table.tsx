@@ -28,8 +28,10 @@ import {
   SearchIcon,
   Trash2Icon,
 } from "lucide-react"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 import { toast } from "sonner"
-import type { AccessCode, Trip } from "@prisma/client"
+import type { AccessCode, ItineraryStatus, Trip } from "@prisma/client"
 
 import StatusBadge from "@/components/StatusBadge"
 import { Button } from "@/components/ui/button"
@@ -59,7 +61,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-export type TripRow = Trip & { school: { name: string }; accessCodes: AccessCode[] }
+export type TripRow = Trip & {
+  school: { name: string }
+  accessCodes: AccessCode[]
+  monitorNames: string[]
+  itineraryItems: { dayNumber: number; title: string; status: ItineraryStatus }[]
+}
 
 function codeFor(trip: TripRow, role: "PARENT" | "MONITOR") {
   return trip.accessCodes.find((c) => c.role === role)?.code ?? "—"
@@ -139,12 +146,6 @@ function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
     enableHiding: false,
   },
   {
-    id: "school",
-    header: "Colegio",
-    accessorFn: (row) => row.school.name,
-    cell: ({ row }) => row.original.school.name,
-  },
-  {
     accessorKey: "destination",
     header: "Destino",
   },
@@ -154,9 +155,19 @@ function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
   },
   {
-    id: "day",
-    header: "Día",
-    cell: ({ row }) => `${row.original.currentDay}/${row.original.totalDays}`,
+    id: "inOut",
+    header: "In-Out",
+    cell: ({ row }) => (
+      <span className="whitespace-nowrap text-sm">
+        {format(new Date(row.original.startDate), "d MMM", { locale: es })}–
+        {format(new Date(row.original.endDate), "d MMM", { locale: es })}
+      </span>
+    ),
+  },
+  {
+    id: "monitor",
+    header: "Monitor",
+    cell: ({ row }) => row.original.monitorNames.join(", ") || "—",
   },
   {
     id: "parentCode",
