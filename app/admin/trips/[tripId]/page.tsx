@@ -464,7 +464,9 @@ export default function AdminTripDetailPage() {
     )
   }
 
-  const currentActivity = itinerary.find((item) => item.status !== 'COMPLETED')
+  const pendingItineraryItems = itinerary.filter((item) => item.status !== 'COMPLETED')
+  const currentActivity = pendingItineraryItems[0]
+  const nextActivity = pendingItineraryItems[1]
   const completedActivityCount = itinerary.filter((item) => item.status === 'COMPLETED').length
 
   return (
@@ -554,19 +556,16 @@ export default function AdminTripDetailPage() {
           </TabsList>
 
           <TabsContent value="resumen" className="mt-4 flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Estado</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center justify-between gap-3">
+        <Card>
+          <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 divide-x divide-border py-4">
+            <div className="flex items-center gap-2">
               <StatusBadge status={trip.status} />
               <Select
                 value={trip.status}
                 onValueChange={(value) => handleStatusChange(value as TripStatus)}
                 disabled={updatingStatus}
               >
-                <SelectTrigger className="w-44">
+                <SelectTrigger className="w-40">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -577,31 +576,42 @@ export default function AdminTripDetailPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Destino</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-lg font-semibold">{trip.destination}</p>
-              <p className="text-sm text-muted-foreground">
+            </div>
+            <div className="pl-6">
+              <p className="text-xs text-muted-foreground">Colegio</p>
+              <p className="text-sm font-medium">{trip.school.name}</p>
+            </div>
+            <div className="pl-6">
+              <p className="text-xs text-muted-foreground">Destino</p>
+              <p className="text-sm font-medium">{trip.destination}</p>
+            </div>
+            <div className="pl-6">
+              <p className="text-xs text-muted-foreground">Fechas</p>
+              <p className="text-sm font-medium">
                 {format(new Date(trip.startDate), 'd MMM', { locale: es })}–
                 {format(new Date(trip.endDate), 'd MMM', { locale: es })} · Día {trip.currentDay} de{' '}
                 {trip.totalDays}
               </p>
+            </div>
+            <div className="pl-6">
+              <p className="text-xs text-muted-foreground">Alumnos</p>
+              <p className="text-sm font-medium">{trip.studentCount}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle>Ubicación actual</CardTitle>
+          </CardHeader>
+          {ping ? (
+            <MapView lat={ping.lat} lng={ping.lng} height="420px" label={trip.name} />
+          ) : (
+            <CardContent className="flex h-48 items-center justify-center text-muted-foreground">
+              Sin ubicación reportada todavía.
             </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm text-muted-foreground">Alumnos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-lg font-semibold">{trip.studentCount}</p>
-              <p className="text-sm text-muted-foreground">{trip.school.name}</p>
-            </CardContent>
-          </Card>
-        </div>
+          )}
+        </Card>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
@@ -619,6 +629,11 @@ export default function AdminTripDetailPage() {
               ) : (
                 <p className="text-sm text-muted-foreground">Sin actividades pendientes.</p>
               )}
+              {nextActivity ? (
+                <p className="text-xs text-muted-foreground">
+                  Próxima: {nextActivity.title} · {nextActivity.time}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {completedActivityCount}/{itinerary.length} actividades completadas
               </p>
@@ -650,19 +665,6 @@ export default function AdminTripDetailPage() {
             </CardContent>
           </Card>
         </div>
-
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <CardTitle>Ubicación actual</CardTitle>
-          </CardHeader>
-          {ping ? (
-            <MapView lat={ping.lat} lng={ping.lng} height="360px" label={trip.name} />
-          ) : (
-            <CardContent className="flex h-48 items-center justify-center text-muted-foreground">
-              Sin ubicación reportada todavía.
-            </CardContent>
-          )}
-        </Card>
 
         {trip.legs.length > 1 ? (
           <Card>
