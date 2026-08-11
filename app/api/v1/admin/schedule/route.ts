@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server'
+import { Role } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { ApiError } from '@/lib/api/errors'
 import { requireAdmin } from '@/lib/api/require-role'
 import { withApiHandler } from '@/lib/api/handler'
+import { describeUsers } from '@/lib/api/clerk-users'
 
-const MAX_RANGE_DAYS = 90
+// Kept in sync with MAX_RANGE_DAYS in app/admin/schedule/page.tsx — the grid
+// itself is the real constraint, no point letting the API accept more than
+// the UI can usefully render.
+const MAX_RANGE_DAYS = 62
 const DEFAULT_RANGE_DAYS = 21
 
 function parseRange(fromParam: string | null, toParam: string | null): { start: Date; end: Date } {
@@ -38,9 +43,17 @@ export const GET = withApiHandler(async (request) => {
       school: { select: { name: true } },
       program: { select: { name: true } },
       itineraryItems: { select: { dayNumber: true, title: true, time: true }, orderBy: { dayNumber: 'asc' } },
+      memberships: { where: { role: Role.MONITOR }, select: { clerkUserId: true } },
     },
     orderBy: { startDate: 'asc' },
   })
 
-  return NextResponse.json({ range: { start, end }, trips })
+  const monitorIds = trips.flatMap((trip) => trip.memberships.map((m) => m.clerkUserId))
+  const users = await describeUsers(monitorIds)
+  const result = trips.map(({ memberships, ...trip }) => ({
+    ...trip,
+    monitorNames: memberships.map((m) => users.get(m.clerkUserId)?.name).filter((n): n is string => !!n),
+  }))
+
+  return NextResponse.json({ range: { start, end }, trips: result })
 })

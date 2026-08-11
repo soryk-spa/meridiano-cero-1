@@ -46,23 +46,28 @@ model AdminUser {
 }
 
 model Trip {
-  id           String     @id @default(cuid())
-  name         String
-  destination  String
-  schoolId     String
-  school       School     @relation(fields: [schoolId], references: [id])
-  startDate    DateTime
-  endDate      DateTime
-  status       TripStatus @default(IN_TRANSIT)
-  currentDay   Int        @default(1)
-  totalDays    Int
-  studentCount Int
-  initialLat   Float
-  initialLng   Float
-  hotel        String?
-  programId    String
-  program      Program    @relation(fields: [programId], references: [id], onDelete: Restrict)
-  createdAt    DateTime   @default(now())
+  id                   String     @id @default(cuid())
+  name                 String
+  curso                String?
+  destination          String
+  schoolId             String
+  school               School     @relation(fields: [schoolId], references: [id])
+  startDate            DateTime
+  endDate              DateTime
+  status               TripStatus @default(IN_TRANSIT)
+  currentDay           Int        @default(1)
+  totalDays            Int
+  studentCount         Int
+  studentCountMale     Int?
+  studentCountFemale   Int?
+  companionCountMale   Int?
+  companionCountFemale Int?
+  initialLat           Float
+  initialLng           Float
+  hotel                String?
+  programId            String
+  program              Program    @relation(fields: [programId], references: [id], onDelete: Restrict)
+  createdAt            DateTime   @default(now())
 
   memberships    TripMembership[]
   accessCodes    AccessCode[]
@@ -166,6 +171,7 @@ model AnnouncementTemplate {
 model ActivityTemplate {
   id                  String   @id @default(cuid())
   title               String
+  destination         String?
   defaultLocation     String?
   description         String
   requirementsMessage String?

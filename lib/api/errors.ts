@@ -31,10 +31,24 @@ export function apiErrorResponse(error: ApiError) {
   )
 }
 
+const UNIQUE_FIELD_LABELS: Record<string, string> = {
+  code: 'ese código',
+  name: 'ese nombre',
+  email: 'ese correo',
+  clerkUserId: 'esa cuenta',
+}
+
+function uniqueConstraintMessage(error: Prisma.PrismaClientKnownRequestError): string {
+  const target = error.meta?.target
+  const fields = Array.isArray(target) ? target : typeof target === 'string' ? [target] : []
+  const label = fields.map((field) => UNIQUE_FIELD_LABELS[field]).find(Boolean)
+  return label ? `Ya existe un registro con ${label}.` : 'That value is already in use.'
+}
+
 export function handleApiError(error: unknown) {
   if (error instanceof ApiError) return apiErrorResponse(error)
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-    return apiErrorResponse(new ApiError('VALIDATION_ERROR', 'That value is already in use.'))
+    return apiErrorResponse(new ApiError('VALIDATION_ERROR', uniqueConstraintMessage(error)))
   }
   console.error(error)
   return NextResponse.json(

@@ -39,11 +39,16 @@ export const GET = withApiHandler(async () => {
 const bodySchema = z
   .object({
     name: z.string().trim().min(1),
-    schoolId: z.string().trim().min(1),
+    curso: z.string().trim().min(1).optional(),
+    school: z.string().trim().min(1),
     destination: z.string().trim().min(1),
     startDate: z.iso.datetime(),
     endDate: z.iso.datetime(),
     studentCount: z.number().int().nonnegative(),
+    studentCountMale: z.number().int().nonnegative().optional(),
+    studentCountFemale: z.number().int().nonnegative().optional(),
+    companionCountMale: z.number().int().nonnegative().optional(),
+    companionCountFemale: z.number().int().nonnegative().optional(),
     initialLat: z.number().min(-90).max(90),
     initialLng: z.number().min(-180).max(180),
     parentCode: z.string().trim().min(1),
@@ -72,7 +77,7 @@ export const POST = withApiHandler(async (request) => {
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'Missing or invalid trip fields.')
 
-  const { schoolId, parentCode, monitorCode, programId, legs, ...tripData } = parsed.data
+  const { school: schoolName, parentCode, monitorCode, programId, legs, ...tripData } = parsed.data
   const startDate = new Date(tripData.startDate)
   const endDate = new Date(tripData.endDate)
   const totalDays = differenceInCalendarDays(endDate, startDate) + 1
@@ -80,8 +85,9 @@ export const POST = withApiHandler(async (request) => {
   const program = await prisma.program.findUnique({ where: { id: programId } })
   if (!program) throw new ApiError('VALIDATION_ERROR', 'Program not found.')
 
-  const school = await prisma.school.findUnique({ where: { id: schoolId } })
-  if (!school) throw new ApiError('VALIDATION_ERROR', 'School not found.')
+  const school =
+    (await prisma.school.findFirst({ where: { name: { equals: schoolName, mode: 'insensitive' } } })) ??
+    (await prisma.school.create({ data: { name: schoolName } }))
 
   const trip = await prisma.trip.create({
     data: {

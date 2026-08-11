@@ -4,21 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { addDays, eachDayOfInterval, format, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { InfoIcon, LayoutGridIcon, SearchIcon } from 'lucide-react'
+import { InfoIcon, LayoutGridIcon } from 'lucide-react'
 import type { DateRange } from 'react-day-picker'
 import { SiteHeader } from '@/components/site-header'
-import { DateRangePicker } from '@/components/date-range-picker'
 import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
 import { Card } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { GlobalFilters } from '@/components/global-filters'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -38,10 +30,9 @@ type ScheduleTrip = {
   currentDay: number
   totalDays: number
   itineraryItems: { dayNumber: number; time: string; title: string }[]
+  monitorNames: string[]
 }
 
-const ALL_SCHOOLS = 'all'
-const ALL_DESTINATIONS = 'all'
 const MAX_RANGE_DAYS = 62
 
 function itemDate(trip: ScheduleTrip, dayNumber: number) {
@@ -59,8 +50,9 @@ export default function AdminSchedulePage() {
   const [trips, setTrips] = useState<ScheduleTrip[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [schoolFilter, setSchoolFilter] = useState(ALL_SCHOOLS)
-  const [destinationFilter, setDestinationFilter] = useState(ALL_DESTINATIONS)
+  const [schoolFilter, setSchoolFilter] = useState<string[]>([])
+  const [destinationFilter, setDestinationFilter] = useState<string[]>([])
+  const [monitorFilter, setMonitorFilter] = useState<string[]>([])
 
   const load = useCallback(async (from: Date, to: Date) => {
     setTrips(null)
@@ -91,66 +83,56 @@ export default function AdminSchedulePage() {
     () => Array.from(new Set((trips ?? []).map((trip) => trip.destination))).sort(),
     [trips]
   )
+  const monitorOptions = useMemo(
+    () => Array.from(new Set((trips ?? []).flatMap((trip) => trip.monitorNames))).sort(),
+    [trips]
+  )
 
   const filteredTrips = useMemo(() => {
     const query = search.trim().toLowerCase()
     return (trips ?? []).filter((trip) => {
       const matchesSearch = !query || trip.name.toLowerCase().includes(query)
-      const matchesSchool = schoolFilter === ALL_SCHOOLS || trip.school.name === schoolFilter
-      const matchesDestination = destinationFilter === ALL_DESTINATIONS || trip.destination === destinationFilter
-      return matchesSearch && matchesSchool && matchesDestination
+      const matchesSchool = schoolFilter.length === 0 || schoolFilter.includes(trip.school.name)
+      const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(trip.destination)
+      const matchesMonitor =
+        monitorFilter.length === 0 || trip.monitorNames.some((name) => monitorFilter.includes(name))
+      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
     })
-  }, [trips, search, schoolFilter, destinationFilter])
+  }, [trips, search, schoolFilter, destinationFilter, monitorFilter])
 
   const days = useMemo(() => {
-    if (!filteredTrips.length) return []
+    if (!filteredTrips.length || !dateRange?.from || !dateRange?.to) return []
     const starts = filteredTrips.map((trip) => new Date(trip.startDate).getTime())
     const ends = filteredTrips.map((trip) => new Date(trip.endDate).getTime())
-    return eachDayOfInterval({ start: new Date(Math.min(...starts)), end: new Date(Math.max(...ends)) })
-  }, [filteredTrips])
+    // Clamp to the selected range so a trip that runs longer than the picked
+    // dates doesn't blow the grid out past what the user actually asked to see.
+    const start = Math.max(Math.min(...starts), dateRange.from.getTime())
+    const end = Math.min(Math.max(...ends), dateRange.to.getTime())
+    if (start > end) return []
+    return eachDayOfInterval({ start: new Date(start), end: new Date(end) })
+  }, [filteredTrips, dateRange])
   const spanTooLarge = days.length > MAX_RANGE_DAYS
 
   return (
     <TooltipProvider delayDuration={200}>
       <SiteHeader title="Organizador" subtitle="Grilla de actividades por día" />
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="sm:w-64">
-            <DateRangePicker value={dateRange} onChange={setDateRange} />
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="relative sm:w-48">
-              <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-              <Input placeholder="Buscar gira…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
-            </div>
-            <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-              <SelectTrigger className="sm:w-44">
-                <SelectValue placeholder="Colegio" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_SCHOOLS}>Todos los colegios</SelectItem>
-                {schoolOptions.map((school) => (
-                  <SelectItem key={school} value={school}>
-                    {school}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={destinationFilter} onValueChange={setDestinationFilter}>
-              <SelectTrigger className="sm:w-44">
-                <SelectValue placeholder="Destino" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_DESTINATIONS}>Todos los destinos</SelectItem>
-                {destinationOptions.map((destination) => (
-                  <SelectItem key={destination} value={destination}>
-                    {destination}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <GlobalFilters
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar grupo…"
+          schoolOptions={schoolOptions}
+          schoolFilter={schoolFilter}
+          onSchoolFilterChange={setSchoolFilter}
+          destinationOptions={destinationOptions}
+          destinationFilter={destinationFilter}
+          onDestinationFilterChange={setDestinationFilter}
+          monitorOptions={monitorOptions}
+          monitorFilter={monitorFilter}
+          onMonitorFilterChange={setMonitorFilter}
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+        />
 
         {loadError && !trips ? (
           <FetchError
@@ -162,7 +144,7 @@ export default function AdminSchedulePage() {
         ) : spanTooLarge ? (
           <EmptyState
             icon={LayoutGridIcon}
-            title="Las giras visibles abarcan un rango muy amplio."
+            title="Los grupos visibles abarcan un rango muy amplio."
             description={`Achica los filtros o el rango de fechas para ver el detalle día por día (máximo ${MAX_RANGE_DAYS} días).`}
           />
         ) : filteredTrips.length ? (
@@ -170,7 +152,7 @@ export default function AdminSchedulePage() {
             <Table containerClassName="h-full" className="h-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="sticky left-0 top-0 z-20 w-40 bg-background">Gira</TableHead>
+                  <TableHead className="sticky left-0 top-0 z-20 w-40 bg-background">Grupo</TableHead>
                   <TableHead className="sticky top-0 z-10 w-28 bg-background">Colegio</TableHead>
                   <TableHead className="sticky top-0 z-10 w-14 bg-background">Pax</TableHead>
                   <TableHead className="sticky top-0 z-10 w-28 bg-background">Hotel</TableHead>
@@ -180,6 +162,7 @@ export default function AdminSchedulePage() {
                       key={day.toISOString()}
                       className="sticky top-0 z-10 whitespace-nowrap bg-background text-center"
                     >
+                      <span className="block capitalize">{format(day, 'EEE', { locale: es })}</span>
                       {format(day, 'd MMM', { locale: es })}
                     </TableHead>
                   ))}
@@ -280,8 +263,8 @@ export default function AdminSchedulePage() {
         ) : (
           <EmptyState
             icon={LayoutGridIcon}
-            title="Sin giras en este rango."
-            description="Ajusta las fechas o los filtros para ver otras giras."
+            title="Sin grupos en este rango."
+            description="Ajusta las fechas o los filtros para ver otros grupos."
           />
         )}
       </div>
@@ -351,7 +334,7 @@ function TripDetailPopoverContent({ trip }: { trip: ScheduleTrip }) {
         </div>
       )}
       <Link href={`/admin/trips/${trip.id}`} className="text-xs text-primary hover:underline">
-        Ver gira completa →
+        Ver grupo completo →
       </Link>
     </div>
   )

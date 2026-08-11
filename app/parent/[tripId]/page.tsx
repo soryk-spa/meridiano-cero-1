@@ -25,7 +25,7 @@ function timeAgo(date: Date): string {
 
 export default function ParentHome() {
   const { trip, itinerary, announcements, location } = useTripContext()
-  if (!trip) return <div className="p-8 text-center text-muted-foreground">Gira no encontrada.</div>
+  if (!trip) return <div className="p-8 text-center text-muted-foreground">Grupo no encontrado.</div>
 
   const currentActivity = itinerary.find((i) => i.status === 'IN_PROGRESS')
   const nextActivity = itinerary.find((i) => i.status === 'PENDING')

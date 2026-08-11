@@ -5,12 +5,20 @@ import { useParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useUser } from '@clerk/nextjs'
 import { Radio, Navigation, Send, Signal, Camera, Trash2, Loader2, CheckCircle } from 'lucide-react'
-import type { AnnouncementTemplate, Trip, ItineraryItem, ItineraryStatus } from '@prisma/client'
-import { itineraryStatusLabels } from '@/lib/labels'
+import type { AnnouncementTemplate, Trip, ItineraryItem, ItineraryStatus, TripStatus } from '@prisma/client'
+import { itineraryStatusLabels, tripStatusLabels } from '@/lib/labels'
+import StatusBadge from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
@@ -42,6 +50,17 @@ const MESSAGE_BY_TRANSITION: Record<ActivityTransition, (title: string) => strin
   TERMINADA: (title) => `Actividad terminada: ${title}`,
 }
 
+// Trip-level status, changeable by the monitor with the same one-click +
+// auto-comunicado pattern already used for itinerary items above.
+const TRIP_STATUS_OPTIONS: TripStatus[] = ['IN_ACTIVITY', 'RESTING', 'FINISHED']
+
+const TRIP_STATUS_MESSAGE: Record<TripStatus, string> = {
+  IN_TRANSIT: 'El grupo está en tránsito.',
+  IN_ACTIVITY: 'El grupo está en actividad.',
+  RESTING: 'El grupo está descansando.',
+  FINISHED: 'El grupo finalizó su itinerario.',
+}
+
 interface GpsPoint {
   lat: number
   lng: number
@@ -67,6 +86,7 @@ export default function MonitorPage() {
   const [applyingTransition, setApplyingTransition] = useState<{ itemId: string; transition: ActivityTransition } | null>(
     null
   )
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pendingItemId = useRef<string | null>(null)
@@ -163,7 +183,7 @@ export default function MonitorPage() {
     const announcementForm = new FormData()
     announcementForm.append('title', TRANSITION_LABEL[transition])
     announcementForm.append('message', MESSAGE_BY_TRANSITION[transition](item.title))
-    announcementForm.append('authorName', user?.fullName ?? 'Monitor')
+    announcementForm.append('authorName', user?.fullName ?? 'Coordinador')
     announcementForm.append('type', 'INFO')
     if (photoFile) announcementForm.append('file', photoFile)
 
@@ -186,6 +206,31 @@ export default function MonitorPage() {
     void applyTransition(item, transition)
   }
 
+  async function handleTripStatusChange(newStatus: TripStatus) {
+    if (!trip || newStatus === trip.status) return
+    setUpdatingStatus(true)
+    const statusRes = await fetch(`/api/v1/trips/${tripId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    })
+    if (statusRes.ok) {
+      const { trip: updated } = await statusRes.json()
+      setTrip(updated)
+      await fetch(`/api/v1/trips/${tripId}/announcements`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Estado: ${tripStatusLabels[newStatus]}`,
+          message: TRIP_STATUS_MESSAGE[newStatus],
+          authorName: user?.fullName ?? 'Coordinador',
+          type: 'INFO',
+        }),
+      })
+    }
+    setUpdatingStatus(false)
+  }
+
   async function sendAnnouncement() {
     const template = templates.find((t) => t.id === selectedTemplateId)
     if (!template) return
@@ -197,7 +242,7 @@ export default function MonitorPage() {
       body: JSON.stringify({
         title: template.title,
         message: template.message,
-        authorName: user?.fullName ?? 'Monitor',
+        authorName: user?.fullName ?? 'Coordinador',
         type: template.type,
       }),
     })
@@ -217,7 +262,7 @@ export default function MonitorPage() {
       body: JSON.stringify({
         title: `Requisitos: ${item.title}`,
         message: item.requirementsMessage,
-        authorName: user?.fullName ?? 'Monitor',
+        authorName: user?.fullName ?? 'Coordinador',
         type: 'INFO',
       }),
     })
@@ -283,6 +328,35 @@ export default function MonitorPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Left column: GPS + status */}
             <div className="space-y-4">
+              {/* Trip status */}
+              <Card>
+                <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold">Estado del grupo</CardTitle>
+                  <StatusBadge status={trip.status} />
+                </CardHeader>
+                <CardContent>
+                  <Select
+                    value={trip.status}
+                    onValueChange={(value) => void handleTripStatusChange(value as TripStatus)}
+                    disabled={updatingStatus || trip.status === 'FINISHED'}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRIP_STATUS_OPTIONS.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {tripStatusLabels[status]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Cambiar el estado publica un comunicado automático a apoderados.
+                  </p>
+                </CardContent>
+              </Card>
+
               {/* GPS Card */}
               <Card className="overflow-hidden">
                 <CardHeader className="flex-row items-center justify-between space-y-0 pb-2">

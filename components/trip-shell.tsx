@@ -34,7 +34,7 @@ type TripShellRole = "parent" | "monitor"
 
 const roleLabels: Record<TripShellRole, string> = {
   parent: "Apoderado",
-  monitor: "Monitor",
+  monitor: "Coordinador",
 }
 
 export function TripShell({
@@ -58,7 +58,7 @@ export function TripShell({
           { title: "Itinerario", url: `${base}/itinerary`, icon: CalendarDays },
           { title: "Comunicados", url: `${base}/announcements`, icon: Bell },
         ]
-      : [{ title: "Panel monitor", url: base, icon: Radio }]
+      : [{ title: "Panel coordinador", url: base, icon: Radio }]
 
   return (
     <SidebarProvider
@@ -81,9 +81,9 @@ export function TripShell({
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton className="h-auto items-start py-2" tooltip={trip?.name ?? "Gira"}>
+              <SidebarMenuButton className="h-auto items-start py-2" tooltip={trip?.name ?? "Grupo"}>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{trip?.name ?? "Cargando gira..."}</span>
+                  <span className="truncate font-medium">{trip?.name ?? "Cargando grupo..."}</span>
                   <span className="truncate text-xs text-sidebar-foreground/70">
                     {trip?.school.name ?? roleLabels[role]}
                   </span>

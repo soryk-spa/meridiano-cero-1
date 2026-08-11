@@ -4,14 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 const FAQS = [
   {
-    question: '¿Cómo creo una nueva gira?',
+    question: '¿Cómo creo un nuevo grupo?',
     answer:
-      'Ve a "Giras" en el menú lateral y usa el botón "Nueva gira". Se generarán automáticamente los códigos de acceso para apoderados y monitor.',
+      'Ve a "Grupos" en el menú lateral y usa el botón "Nuevo grupo". Se generarán automáticamente los códigos de acceso para apoderados y coordinador.',
   },
   {
     question: '¿Cómo genero un código de acceso adicional?',
     answer:
-      'En "Códigos" puedes generar nuevos códigos para cualquier gira existente, ya sea para apoderados o monitores, y revocarlos cuando ya no sean necesarios.',
+      'En "Códigos" puedes generar nuevos códigos para cualquier grupo existente, ya sea para apoderados o coordinadores, y revocarlos cuando ya no sean necesarios.',
   },
   {
     question: '¿Cómo invito a otro administrador?',
@@ -19,14 +19,14 @@ const FAQS = [
       'En "Equipo" usa el botón "Invitar administrador". La persona invitada recibe un correo y, al registrarse con ese enlace, su acceso de administrador se activa automáticamente.',
   },
   {
-    question: '¿Por qué una gira no aparece en el mapa operativo?',
+    question: '¿Por qué un grupo no aparece en el mapa operativo?',
     answer:
-      'El mapa operativo solo muestra giras que no estén marcadas como "Finalizada". Si una gira no tiene señal de ubicación reciente, se muestra en su posición inicial.',
+      'El mapa operativo solo muestra grupos que no estén marcados como "Finalizado". Si un grupo no tiene señal de ubicación reciente, se muestra en su posición inicial.',
   },
   {
-    question: '¿Cómo cambio el estado de una gira manualmente?',
+    question: '¿Cómo cambio el estado de un grupo manualmente?',
     answer:
-      'Entra al detalle de la gira desde "Giras" y usa el selector de estado en la parte superior. Los administradores pueden anular el estado reportado por el monitor.',
+      'Entra al detalle del grupo desde "Grupos" y usa el selector de estado en la parte superior. Los administradores pueden anular el estado reportado por el coordinador.',
   },
 ]
 

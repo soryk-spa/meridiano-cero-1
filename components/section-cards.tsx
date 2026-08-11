@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Activity, ArrowRightIcon, Radio, School, Ticket } from "lucide-react"
+import { Activity, ArrowRightIcon, Radio, Ticket } from "lucide-react"
 
 import {
   Card,
@@ -10,20 +10,19 @@ import {
 } from "@/components/ui/card"
 
 interface SectionCardsProps {
-  tripCount: number
+  activeTripCount: number
   codeCount: number
-  schoolCount: number
   monitorCount: number
 }
 
-export function SectionCards({ tripCount, codeCount, schoolCount, monitorCount }: SectionCardsProps) {
+export function SectionCards({ activeTripCount, codeCount, monitorCount }: SectionCardsProps) {
   const cards = [
     {
       Icon: Activity,
-      label: "Giras activas",
-      value: tripCount,
+      label: "Grupos activos",
+      value: activeTripCount,
       detail: "Operación del mes",
-      footer: "Viajes con seguimiento activo",
+      footer: "Grupos con seguimiento activo",
       href: "/admin/trips",
     },
     {
@@ -31,20 +30,12 @@ export function SectionCards({ tripCount, codeCount, schoolCount, monitorCount }
       label: "Códigos emitidos",
       value: codeCount,
       detail: "Accesos disponibles",
-      footer: "Códigos de apoderado y monitor",
+      footer: "Códigos de apoderado y coordinador",
       href: "/admin/codes",
     },
     {
-      Icon: School,
-      label: "Colegios",
-      value: schoolCount,
-      detail: "Cuentas institucionales",
-      footer: "Colegios con giras activas",
-      href: "/admin/schools",
-    },
-    {
       Icon: Radio,
-      label: "Monitores",
+      label: "Coordinadores",
       value: monitorCount,
       detail: "Equipo en terreno",
       footer: "Usuarios habilitados para reportar",

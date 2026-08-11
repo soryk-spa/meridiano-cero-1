@@ -17,13 +17,23 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
+import { MultiSelectFilter } from '@/components/multi-select-filter'
+import { KNOWN_DESTINATIONS } from '@/lib/destinations'
 
-const EMPTY_FORM = { title: '', defaultLocation: '', description: '', requirementsMessage: '' }
+const EMPTY_FORM = { title: '', destination: '', defaultLocation: '', description: '', requirementsMessage: '' }
+const NO_DESTINATION = 'none'
 
 export default function AdminActivitiesPage() {
   const [activities, setActivities] = useState<ActivityTemplate[] | null>(null)
@@ -34,6 +44,7 @@ export default function AdminActivitiesPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [destinationFilter, setDestinationFilter] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -64,6 +75,7 @@ export default function AdminActivitiesPage() {
     setEditingId(activity.id)
     setForm({
       title: activity.title,
+      destination: activity.destination ?? '',
       defaultLocation: activity.defaultLocation ?? '',
       description: activity.description,
       requirementsMessage: activity.requirementsMessage ?? '',
@@ -78,6 +90,7 @@ export default function AdminActivitiesPage() {
     const body = {
       title: form.title,
       description: form.description,
+      destination: form.destination.trim() || (editingId ? null : undefined),
       defaultLocation: form.defaultLocation.trim() || (editingId ? null : undefined),
       requirementsMessage: form.requirementsMessage.trim() || (editingId ? null : undefined),
     }
@@ -116,19 +129,21 @@ export default function AdminActivitiesPage() {
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return (activities ?? []).filter(
-      (activity) =>
+    return (activities ?? []).filter((activity) => {
+      const matchesSearch =
         !query ||
         activity.title.toLowerCase().includes(query) ||
         (activity.defaultLocation ?? '').toLowerCase().includes(query)
-    )
-  }, [activities, search])
+      const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(activity.destination ?? '')
+      return matchesSearch && matchesDestination
+    })
+  }, [activities, search, destinationFilter])
 
   return (
     <>
       <SiteHeader
         title="Biblioteca de actividades"
-        subtitle="Actividades genéricas reutilizables al armar el itinerario de una gira"
+        subtitle="Actividades genéricas reutilizables al armar el itinerario de un grupo"
         right={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -158,6 +173,27 @@ export default function AdminActivitiesPage() {
                       value={form.defaultLocation}
                       onChange={(e) => setForm((p) => ({ ...p, defaultLocation: e.target.value }))}
                     />
+                  </div>
+                  <div className="flex flex-col gap-2 sm:col-span-2">
+                    <Label>Destino (opcional)</Label>
+                    <Select
+                      value={form.destination || NO_DESTINATION}
+                      onValueChange={(value) =>
+                        setForm((p) => ({ ...p, destination: value === NO_DESTINATION ? '' : value }))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Cualquier destino" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_DESTINATION}>Cualquier destino</SelectItem>
+                        {KNOWN_DESTINATIONS.map((d) => (
+                          <SelectItem key={d.id} value={d.label}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
@@ -198,13 +234,22 @@ export default function AdminActivitiesPage() {
           <Skeleton className="h-64 w-full" />
         ) : (
           <>
-            <div className="relative max-w-xs">
-              <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por título o lugar…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8"
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative max-w-xs">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por título o lugar…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <MultiSelectFilter
+                options={KNOWN_DESTINATIONS.map((d) => d.label)}
+                selected={destinationFilter}
+                onChange={setDestinationFilter}
+                placeholder="Destino"
+                className="sm:w-56"
               />
             </div>
             <Card className="overflow-hidden">
@@ -212,6 +257,7 @@ export default function AdminActivitiesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Título</TableHead>
+                    <TableHead>Destino</TableHead>
                     <TableHead>Lugar por defecto</TableHead>
                     <TableHead>Descripción</TableHead>
                     <TableHead className="w-20" />
@@ -222,6 +268,7 @@ export default function AdminActivitiesPage() {
                     filtered.map((activity) => (
                       <TableRow key={activity.id} className="h-16">
                         <TableCell className="font-medium">{activity.title}</TableCell>
+                        <TableCell className="text-muted-foreground">{activity.destination ?? '—'}</TableCell>
                         <TableCell className="text-muted-foreground">{activity.defaultLocation ?? '—'}</TableCell>
                         <TableCell className="max-w-xs truncate text-muted-foreground">
                           {activity.description}
@@ -242,7 +289,7 @@ export default function AdminActivitiesPage() {
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4}>
+                      <TableCell colSpan={5}>
                         <EmptyState
                           icon={ClipboardListIcon}
                           title={activities.length ? 'Sin resultados para esta búsqueda.' : 'Sin actividades en la biblioteca todavía.'}

@@ -27,11 +27,10 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { FetchError } from '@/components/fetch-error'
+import { roleLabels } from '@/lib/labels'
 
 type CodeRow = AccessCode & { trip: { id: string; name: string } }
 type TripOption = { id: string; name: string }
-
-const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
 
 export default function AdminCodesPage() {
   const [codes, setCodes] = useState<CodeRow[] | null>(null)
@@ -97,7 +96,7 @@ export default function AdminCodesPage() {
     <>
       <SiteHeader
         title="Códigos"
-        subtitle="Códigos de acceso para apoderados, monitores y alumnos"
+        subtitle="Códigos de acceso para apoderados, coordinadores y alumnos"
         right={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -112,10 +111,10 @@ export default function AdminCodesPage() {
               </DialogHeader>
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col gap-2">
-                  <Label>Gira</Label>
+                  <Label>Grupo</Label>
                   <Select value={tripId} onValueChange={setTripId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecciona una gira" />
+                      <SelectValue placeholder="Selecciona un grupo" />
                     </SelectTrigger>
                     <SelectContent>
                       {trips.map((trip) => (
@@ -134,7 +133,7 @@ export default function AdminCodesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="PARENT">Apoderado</SelectItem>
-                      <SelectItem value="MONITOR">Monitor</SelectItem>
+                      <SelectItem value="MONITOR">Coordinador</SelectItem>
                       <SelectItem value="STUDENT">Alumno</SelectItem>
                     </SelectContent>
                   </Select>
@@ -163,7 +162,7 @@ export default function AdminCodesPage() {
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead>Gira</TableHead>
+                  <TableHead>Grupo</TableHead>
                   <TableHead>Creado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>

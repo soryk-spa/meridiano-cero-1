@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { SearchIcon } from 'lucide-react'
 import type { TripStatus } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import StatusBadge from '@/components/StatusBadge'
 import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { FetchError } from '@/components/fetch-error'
-import { MultiSelectFilter } from '@/components/multi-select-filter'
+import { GlobalFilters } from '@/components/global-filters'
 import type { FleetMarker } from '@/components/FleetMapView'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
@@ -24,6 +22,7 @@ type FleetTrip = {
   ping: { lat: number; lng: number; createdAt: string } | null
   initialLat: number
   initialLng: number
+  monitorNames: string[]
 }
 
 const STATUS_COLOR: Record<TripStatus, string> = {
@@ -40,6 +39,7 @@ export default function AdminMapPage() {
   const [search, setSearch] = useState('')
   const [schoolFilter, setSchoolFilter] = useState<string[]>([])
   const [destinationFilter, setDestinationFilter] = useState<string[]>([])
+  const [monitorFilter, setMonitorFilter] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setError(null)
@@ -68,6 +68,10 @@ export default function AdminMapPage() {
     () => Array.from(new Set((fleet ?? []).map((trip) => trip.destination))).sort(),
     [fleet]
   )
+  const monitorOptions = useMemo(
+    () => Array.from(new Set((fleet ?? []).flatMap((trip) => trip.monitorNames))).sort(),
+    [fleet]
+  )
 
   const filteredFleet = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -76,14 +80,16 @@ export default function AdminMapPage() {
         !query || trip.name.toLowerCase().includes(query) || trip.destination.toLowerCase().includes(query)
       const matchesSchool = schoolFilter.length === 0 || schoolFilter.includes(trip.school)
       const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(trip.destination)
-      return matchesSearch && matchesSchool && matchesDestination
+      const matchesMonitor =
+        monitorFilter.length === 0 || trip.monitorNames.some((name) => monitorFilter.includes(name))
+      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
     })
-  }, [fleet, search, schoolFilter, destinationFilter])
+  }, [fleet, search, schoolFilter, destinationFilter, monitorFilter])
 
   if (error && !fleet) {
     return (
       <>
-        <SiteHeader title="Mapa operativo" subtitle="Giras en terreno en tiempo real" />
+        <SiteHeader title="Mapa operativo" subtitle="Grupos en terreno en tiempo real" />
         <FetchError message={error} onRetry={load} />
       </>
     )
@@ -92,7 +98,7 @@ export default function AdminMapPage() {
   if (!fleet) {
     return (
       <>
-        <SiteHeader title="Mapa operativo" subtitle="Giras en terreno en tiempo real" />
+        <SiteHeader title="Mapa operativo" subtitle="Grupos en terreno en tiempo real" />
         <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
           <Skeleton className="h-[calc(100vh-180px)] w-full" />
         </div>
@@ -111,33 +117,22 @@ export default function AdminMapPage() {
 
   return (
     <>
-      <SiteHeader title="Mapa operativo" subtitle="Giras en terreno en tiempo real" />
+      <SiteHeader title="Mapa operativo" subtitle="Grupos en terreno en tiempo real" />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar gira o destino…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-8"
-            />
-          </div>
-          <MultiSelectFilter
-            options={schoolOptions}
-            selected={schoolFilter}
-            onChange={setSchoolFilter}
-            placeholder="Colegio"
-            className="sm:w-56"
-          />
-          <MultiSelectFilter
-            options={destinationOptions}
-            selected={destinationFilter}
-            onChange={setDestinationFilter}
-            placeholder="Destino"
-            className="sm:w-56"
-          />
-        </div>
+        <GlobalFilters
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Buscar grupo o destino…"
+          schoolOptions={schoolOptions}
+          schoolFilter={schoolFilter}
+          onSchoolFilterChange={setSchoolFilter}
+          destinationOptions={destinationOptions}
+          destinationFilter={destinationFilter}
+          onDestinationFilterChange={setDestinationFilter}
+          monitorOptions={monitorOptions}
+          monitorFilter={monitorFilter}
+          onMonitorFilterChange={setMonitorFilter}
+        />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <Card className="overflow-hidden">
             {markers.length ? (
@@ -149,7 +144,7 @@ export default function AdminMapPage() {
               />
             ) : (
               <CardContent className="flex h-[calc(100vh-232px)] items-center justify-center text-muted-foreground">
-                {fleet && fleet.length > 0 ? 'Sin giras que coincidan con el filtro.' : 'Sin giras en terreno actualmente.'}
+                {fleet && fleet.length > 0 ? 'Sin grupos que coincidan con el filtro.' : 'Sin grupos en terreno actualmente.'}
               </CardContent>
             )}
           </Card>
@@ -179,7 +174,7 @@ export default function AdminMapPage() {
               ))}
               {filteredFleet.length === 0 ? (
                 <p className="p-3 text-sm text-muted-foreground">
-                  {fleet && fleet.length > 0 ? 'Sin giras que coincidan con el filtro.' : 'Sin giras en terreno actualmente.'}
+                  {fleet && fleet.length > 0 ? 'Sin grupos que coincidan con el filtro.' : 'Sin grupos en terreno actualmente.'}
                 </p>
               ) : null}
             </CardContent>

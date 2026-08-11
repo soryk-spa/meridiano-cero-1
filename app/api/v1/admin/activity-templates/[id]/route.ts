@@ -7,6 +7,7 @@ import { withApiHandler } from '@/lib/api/handler'
 
 const bodySchema = z.object({
   title: z.string().trim().min(1).optional(),
+  destination: z.string().trim().min(1).nullable().optional(),
   defaultLocation: z.string().trim().min(1).nullable().optional(),
   description: z.string().trim().min(1).optional(),
   requirementsMessage: z.string().trim().min(1).nullable().optional(),

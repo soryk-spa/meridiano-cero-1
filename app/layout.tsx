@@ -9,7 +9,7 @@ const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Meridiano Cero",
-  description: "Plataforma de seguimiento de giras escolares",
+  description: "Plataforma de seguimiento de grupos escolares",
 };
 
 export default function RootLayout({

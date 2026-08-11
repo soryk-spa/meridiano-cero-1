@@ -13,6 +13,32 @@ export const GET = withApiHandler(async (request) => {
   const url = new URL(request.url)
   const query = url.searchParams.get('query')?.trim() || undefined
   const offset = Math.max(Number(url.searchParams.get('offset') ?? '0') || 0, 0)
+  const roleFilter = url.searchParams.getAll('role') as Role[]
+  const schoolFilter = url.searchParams.getAll('school')
+  const destinationFilter = url.searchParams.getAll('destination')
+  const groupFilter = url.searchParams.getAll('group')
+  const hasMembershipFilter =
+    roleFilter.length > 0 || schoolFilter.length > 0 || destinationFilter.length > 0 || groupFilter.length > 0
+
+  let memberUserIds: string[] | undefined
+  if (hasMembershipFilter) {
+    const matches = await prisma.tripMembership.findMany({
+      where: {
+        ...(roleFilter.length ? { role: { in: roleFilter } } : {}),
+        trip: {
+          ...(schoolFilter.length ? { school: { name: { in: schoolFilter } } } : {}),
+          ...(destinationFilter.length ? { destination: { in: destinationFilter } } : {}),
+          ...(groupFilter.length ? { name: { in: groupFilter } } : {}),
+        },
+      },
+      select: { clerkUserId: true },
+      distinct: ['clerkUserId'],
+    })
+    memberUserIds = matches.map((m) => m.clerkUserId)
+    if (memberUserIds.length === 0) {
+      return NextResponse.json({ users: [], totalCount: 0, offset, limit: PAGE_SIZE })
+    }
+  }
 
   const client = await clerkClient()
   const { data: clerkUsers, totalCount } = await client.users.getUserList({
@@ -20,6 +46,7 @@ export const GET = withApiHandler(async (request) => {
     offset,
     query,
     orderBy: '-created_at',
+    ...(memberUserIds ? { userId: memberUserIds } : {}),
   })
 
   const ids = clerkUsers.map((user) => user.id)

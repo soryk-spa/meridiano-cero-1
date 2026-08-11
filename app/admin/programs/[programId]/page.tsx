@@ -187,6 +187,7 @@ export default function AdminProgramDetailPage() {
         onOpenChange={setItemOpen}
         activityTemplates={activityTemplates}
         editingItem={editingItem}
+        existingItems={program?.items}
         onSubmit={handleSaveItem}
       />
     </>

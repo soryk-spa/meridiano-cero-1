@@ -17,6 +17,7 @@ export const GET = withApiHandler(async () => {
 
 const bodySchema = z.object({
   title: z.string().trim().min(1),
+  destination: z.string().trim().min(1).optional(),
   defaultLocation: z.string().trim().min(1).optional(),
   description: z.string().trim().min(1),
   requirementsMessage: z.string().trim().min(1).optional(),

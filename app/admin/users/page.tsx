@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronLeftIcon, ChevronRightIcon, SearchIcon, ShieldIcon, UserPlusIcon, XIcon } from 'lucide-react'
 import type { Role } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
@@ -28,6 +28,10 @@ import {
 } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { FetchError } from '@/components/fetch-error'
+import { GlobalFilters } from '@/components/global-filters'
+import { MultiSelectFilter } from '@/components/multi-select-filter'
+import { roleLabels } from '@/lib/labels'
+import type { TripRow } from '@/components/data-table'
 
 type Membership = { id: string; role: Role; tripId: string; tripName: string }
 type UserRow = {
@@ -41,7 +45,7 @@ type UserRow = {
 }
 type TripOption = { id: string; name: string }
 
-const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
+const ROLE_OPTIONS: Role[] = ['PARENT', 'MONITOR', 'STUDENT']
 
 function initialsFor(name: string) {
   return name
@@ -71,10 +75,44 @@ export default function AdminUsersPage() {
   const [assigning, setAssigning] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
 
+  const [allTrips, setAllTrips] = useState<TripRow[]>([])
+  const [roleFilter, setRoleFilter] = useState<string[]>([])
+  const [schoolFilter, setSchoolFilter] = useState<string[]>([])
+  const [destinationFilter, setDestinationFilter] = useState<string[]>([])
+  const [groupFilter, setGroupFilter] = useState<string[]>([])
+
+  useEffect(() => {
+    const id = window.setTimeout(async () => {
+      const res = await fetch('/api/v1/trips')
+      if (res.ok) setAllTrips((await res.json()).trips)
+    }, 0)
+    return () => window.clearTimeout(id)
+  }, [])
+
+  const schoolOptions = useMemo(() => Array.from(new Set(allTrips.map((t) => t.school.name))).sort(), [allTrips])
+  const destinationOptions = useMemo(() => Array.from(new Set(allTrips.map((t) => t.destination))).sort(), [allTrips])
+  const groupOptions = useMemo(() => Array.from(new Set(allTrips.map((t) => t.name))).sort(), [allTrips])
+  const roleLabelOptions = useMemo(() => ROLE_OPTIONS.map((role) => roleLabels[role]), [])
+  const labelToRole = useMemo(() => new Map(ROLE_OPTIONS.map((role) => [roleLabels[role], role])), [])
+
+  function updateFilter(setter: (value: string[]) => void) {
+    return (value: string[]) => {
+      setOffset(0)
+      setter(value)
+    }
+  }
+
   const load = useCallback(async () => {
     setError(null)
     const params = new URLSearchParams({ offset: String(offset) })
     if (query) params.set('query', query)
+    for (const label of roleFilter) {
+      const role = labelToRole.get(label)
+      if (role) params.append('role', role)
+    }
+    for (const school of schoolFilter) params.append('school', school)
+    for (const destination of destinationFilter) params.append('destination', destination)
+    for (const group of groupFilter) params.append('group', group)
     const res = await fetch(`/api/v1/admin/users?${params}`)
     if (res.ok) {
       const data = await res.json()
@@ -85,7 +123,7 @@ export default function AdminUsersPage() {
       const data = await res.json().catch(() => null)
       setError(data?.error?.message ?? 'No se pudieron cargar los usuarios.')
     }
-  }, [offset, query])
+  }, [offset, query, roleFilter, schoolFilter, destinationFilter, groupFilter, labelToRole])
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -142,7 +180,7 @@ export default function AdminUsersPage() {
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      setAssignError(data?.error?.message ?? 'No se pudo asociar a la gira.')
+      setAssignError(data?.error?.message ?? 'No se pudo asociar al grupo.')
     }
   }
 
@@ -167,6 +205,27 @@ export default function AdminUsersPage() {
             Buscar
           </Button>
         </form>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <MultiSelectFilter
+            options={roleLabelOptions}
+            selected={roleFilter}
+            onChange={updateFilter(setRoleFilter)}
+            placeholder="Rol"
+            className="sm:w-40"
+          />
+          <GlobalFilters
+            groupOptions={groupOptions}
+            groupFilter={groupFilter}
+            onGroupFilterChange={updateFilter(setGroupFilter)}
+            schoolOptions={schoolOptions}
+            schoolFilter={schoolFilter}
+            onSchoolFilterChange={updateFilter(setSchoolFilter)}
+            destinationOptions={destinationOptions}
+            destinationFilter={destinationFilter}
+            onDestinationFilterChange={updateFilter(setDestinationFilter)}
+          />
+        </div>
 
         <Card className="overflow-hidden">
           {error && !users ? (
@@ -246,19 +305,19 @@ export default function AdminUsersPage() {
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm" onClick={() => openAssignDialog(user)}>
                                 <UserPlusIcon />
-                                Asociar a gira
+                                Asociar a grupo
                               </Button>
                             </DialogTrigger>
                             <DialogContent>
                               <DialogHeader>
-                                <DialogTitle>Asociar a una gira</DialogTitle>
+                                <DialogTitle>Asociar a un grupo</DialogTitle>
                               </DialogHeader>
                               <div className="flex flex-col gap-4">
                                 <div className="flex flex-col gap-2">
-                                  <Label>Gira</Label>
+                                  <Label>Grupo</Label>
                                   <Select value={assignTripId} onValueChange={setAssignTripId}>
                                     <SelectTrigger>
-                                      <SelectValue placeholder="Selecciona una gira" />
+                                      <SelectValue placeholder="Selecciona un grupo" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {trips.map((trip) => (
@@ -276,9 +335,11 @@ export default function AdminUsersPage() {
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="PARENT">Apoderado</SelectItem>
-                                      <SelectItem value="MONITOR">Monitor</SelectItem>
-                                      <SelectItem value="STUDENT">Alumno</SelectItem>
+                                      {ROLE_OPTIONS.map((role) => (
+                                        <SelectItem key={role} value={role}>
+                                          {roleLabels[role]}
+                                        </SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
                                 </div>

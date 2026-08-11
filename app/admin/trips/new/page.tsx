@@ -22,7 +22,7 @@ export default function NewTripPage() {
 
   return (
     <>
-      <SiteHeader title="Nueva gira" subtitle="Crea una gira y genera sus códigos de acceso" />
+      <SiteHeader title="Nuevo grupo" subtitle="Crea un grupo y genera sus códigos de acceso" />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
         <Card className="mx-auto w-full max-w-4xl">
           <CardContent className="p-6">
@@ -31,9 +31,9 @@ export default function NewTripPage() {
                 <MapPinPlusIcon size={18} />
               </span>
               <div>
-                <p className="font-semibold">Detalles de la gira</p>
+                <p className="font-semibold">Detalles del grupo</p>
                 <p className="text-sm text-muted-foreground">
-                  Estos datos quedarán disponibles para apoderados y monitores.
+                  Estos datos quedarán disponibles para apoderados y coordinadores.
                 </p>
               </div>
             </div>
@@ -50,7 +50,7 @@ export default function NewTripPage() {
                 <Link href="/admin/trips">Cancelar</Link>
               </Button>
               <Button type="submit" form={FORM_ID} disabled={!formState.canSubmit}>
-                {formState.submitting ? 'Creando…' : 'Crear gira'}
+                {formState.submitting ? 'Creando…' : 'Crear grupo'}
               </Button>
             </div>
           </CardContent>

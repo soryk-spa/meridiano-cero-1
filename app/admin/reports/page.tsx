@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DownloadIcon, FileTextIcon } from 'lucide-react'
 import type { Announcement, AnnouncementType } from '@prisma/client'
+import type { DateRange } from 'react-day-picker'
 import { SiteHeader } from '@/components/site-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { EmptyState } from '@/components/empty-state'
 import { FetchError } from '@/components/fetch-error'
+import { GlobalFilters } from '@/components/global-filters'
 import { announcementTypeLabels } from '@/lib/labels'
 import type { TripRow } from '@/components/data-table'
 
@@ -46,7 +48,7 @@ function downloadCsv(trips: TripRow[]) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `giras-${new Date().toISOString().slice(0, 10)}.csv`
+  link.download = `grupos-${new Date().toISOString().slice(0, 10)}.csv`
   link.click()
   URL.revokeObjectURL(url)
 }
@@ -55,7 +57,11 @@ export default function AdminReportsPage() {
   const [reports, setReports] = useState<ReportRow[] | null>(null)
   const [trips, setTrips] = useState<TripRow[]>([])
   const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'ALL'>('ALL')
-  const [schoolFilter, setSchoolFilter] = useState('ALL')
+  const [search, setSearch] = useState('')
+  const [schoolFilter, setSchoolFilter] = useState<string[]>([])
+  const [destinationFilter, setDestinationFilter] = useState<string[]>([])
+  const [monitorFilter, setMonitorFilter] = useState<string[]>([])
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
@@ -85,15 +91,46 @@ export default function AdminReportsPage() {
     () => Array.from(new Set(trips.map((trip) => trip.school.name))).sort(),
     [trips]
   )
+  const destinationOptions = useMemo(
+    () => Array.from(new Set(trips.map((trip) => trip.destination))).sort(),
+    [trips]
+  )
+  const monitorOptions = useMemo(
+    () => Array.from(new Set(trips.flatMap((trip) => trip.monitorNames))).sort(),
+    [trips]
+  )
+
+  const matchingTripIds = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return new Set(
+      trips
+        .filter((trip) => {
+          const matchesSearch = !query || trip.name.toLowerCase().includes(query)
+          const matchesSchool = schoolFilter.length === 0 || schoolFilter.includes(trip.school.name)
+          const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(trip.destination)
+          const matchesMonitor =
+            monitorFilter.length === 0 || trip.monitorNames.some((name) => monitorFilter.includes(name))
+          return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
+        })
+        .map((trip) => trip.id)
+    )
+  }, [trips, search, schoolFilter, destinationFilter, monitorFilter])
 
   const filtered = useMemo(
     () =>
-      (reports ?? []).filter(
-        (report) =>
-          (typeFilter === 'ALL' || report.type === typeFilter) &&
-          (schoolFilter === 'ALL' || report.trip.school.name === schoolFilter)
-      ),
-    [reports, typeFilter, schoolFilter]
+      (reports ?? []).filter((report) => {
+        const matchesType = typeFilter === 'ALL' || report.type === typeFilter
+        const matchesTrip = matchingTripIds.has(report.trip.id)
+        let matchesDate = true
+        if (dateRange?.from && dateRange?.to) {
+          const createdAt = new Date(report.createdAt)
+          const endOfDay = new Date(dateRange.to)
+          endOfDay.setHours(23, 59, 59, 999)
+          matchesDate = createdAt >= dateRange.from && createdAt <= endOfDay
+        }
+        return matchesType && matchesTrip && matchesDate
+      }),
+    [reports, typeFilter, matchingTripIds, dateRange]
   )
 
   return (
@@ -104,14 +141,14 @@ export default function AdminReportsPage() {
         right={
           <Button variant="outline" size="xs" onClick={() => downloadCsv(trips)} disabled={!trips.length}>
             <DownloadIcon />
-            Exportar giras (CSV)
+            Exportar grupos (CSV)
           </Button>
         }
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-6 md:p-6">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as AnnouncementType | 'ALL')}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="sm:w-44">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -120,19 +157,22 @@ export default function AdminReportsPage() {
               <SelectItem value="ACHIEVEMENT">Logros</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={schoolFilter} onValueChange={setSchoolFilter}>
-            <SelectTrigger className="w-56">
-              <SelectValue placeholder="Todos los colegios" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Todos los colegios</SelectItem>
-              {schoolOptions.map((school) => (
-                <SelectItem key={school} value={school}>
-                  {school}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <GlobalFilters
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Buscar grupo…"
+            schoolOptions={schoolOptions}
+            schoolFilter={schoolFilter}
+            onSchoolFilterChange={setSchoolFilter}
+            destinationOptions={destinationOptions}
+            destinationFilter={destinationFilter}
+            onDestinationFilterChange={setDestinationFilter}
+            monitorOptions={monitorOptions}
+            monitorFilter={monitorFilter}
+            onMonitorFilterChange={setMonitorFilter}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
         </div>
 
         <Card className="overflow-hidden">
@@ -148,7 +188,7 @@ export default function AdminReportsPage() {
                 <TableRow>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Título</TableHead>
-                  <TableHead>Gira</TableHead>
+                  <TableHead>Grupo</TableHead>
                   <TableHead>Autor</TableHead>
                   <TableHead>Fecha</TableHead>
                 </TableRow>

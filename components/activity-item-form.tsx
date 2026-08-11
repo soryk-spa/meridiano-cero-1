@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { TriangleAlertIcon } from 'lucide-react'
 import type { ActivityTemplate } from '@prisma/client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -56,6 +57,7 @@ export function ActivityItemSheet({
   totalDays,
   activityTemplates,
   editingItem,
+  existingItems,
   onSubmit,
 }: {
   open: boolean
@@ -63,6 +65,8 @@ export function ActivityItemSheet({
   totalDays?: number
   activityTemplates: ActivityTemplate[]
   editingItem: ActivityItemEditing | null
+  /** Other items already on this trip/program, used to warn about same-day/same-time overlaps. */
+  existingItems?: { id: string; dayNumber: number; time: string; title: string }[]
   onSubmit: (values: ActivityItemValues, editingItemId: string | null) => Promise<{ ok: boolean; error?: string }>
 }) {
   const [form, setForm] = useState(EMPTY_FORM)
@@ -140,6 +144,16 @@ export function ActivityItemSheet({
     form.location.trim() !== '' &&
     form.description.trim() !== ''
 
+  const overlapWarning = useMemo(() => {
+    const day = Number(form.dayNumber)
+    const time = form.time.trim()
+    if (!existingItems || !time || !day) return null
+    const conflict = existingItems.find(
+      (item) => item.id !== editingItem?.id && item.dayNumber === day && item.time === time
+    )
+    return conflict ? `Ya hay una actividad a esta hora ese día: "${conflict.title}".` : null
+  }, [existingItems, form.dayNumber, form.time, editingItem])
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex flex-col">
@@ -211,6 +225,12 @@ export function ActivityItemSheet({
               />
             </div>
           </div>
+          {overlapWarning ? (
+            <p className="flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-500">
+              <TriangleAlertIcon className="size-4 shrink-0" />
+              {overlapWarning}
+            </p>
+          ) : null}
           <div className="flex flex-col gap-2">
             <Label htmlFor="activity-item-location">Lugar</Label>
             <Input

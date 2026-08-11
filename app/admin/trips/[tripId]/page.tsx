@@ -59,7 +59,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { itineraryStatusLabels, announcementTypeLabels, tripStatusLabels } from '@/lib/labels'
+import { itineraryStatusLabels, announcementTypeLabels, tripStatusLabels, roleLabels } from '@/lib/labels'
 
 const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
@@ -71,7 +71,6 @@ type StudentRow = { id: string; name: string; email: string }
 type ProgramOption = { id: string; name: string }
 
 const STATUS_OPTIONS: TripStatus[] = ['IN_ACTIVITY', 'RESTING', 'FINISHED']
-const roleLabels: Record<Role, string> = { PARENT: 'Apoderado', MONITOR: 'Monitor', STUDENT: 'Alumno' }
 
 function dayDate(startDate: string | Date, dayNumber: number) {
   return addDays(new Date(startDate), dayNumber - 1)
@@ -218,10 +217,10 @@ export default function AdminTripDetailPage() {
     if (res.ok) {
       setTrip((await res.json()).trip)
       setEditOpen(false)
-      toast.success('Gira actualizada.')
+      toast.success('Grupo actualizado.')
     } else {
       const data = await res.json().catch(() => null)
-      const message = data?.error?.message ?? 'No se pudo guardar la gira.'
+      const message = data?.error?.message ?? 'No se pudo guardar el grupo.'
       setEditError(message)
       toast.error(message)
     }
@@ -351,10 +350,10 @@ export default function AdminTripDetailPage() {
   }
 
   async function handleRemoveParent(membershipId: string) {
-    if (!window.confirm('¿Quitar a este apoderado de la gira?')) return
+    if (!window.confirm('¿Quitar a este apoderado del grupo?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
     if (res.ok) {
-      toast.success('Apoderado quitado de la gira.')
+      toast.success('Apoderado quitado del grupo.')
       void load()
     } else {
       const data = await res.json().catch(() => null)
@@ -363,22 +362,22 @@ export default function AdminTripDetailPage() {
   }
 
   async function handleRemoveMonitor(membershipId: string) {
-    if (!window.confirm('¿Quitar a este monitor de la gira?')) return
+    if (!window.confirm('¿Quitar a este coordinador del grupo?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
     if (res.ok) {
-      toast.success('Monitor quitado de la gira.')
+      toast.success('Coordinador quitado del grupo.')
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      toast.error(data?.error?.message ?? 'No se pudo quitar al monitor.')
+      toast.error(data?.error?.message ?? 'No se pudo quitar al coordinador.')
     }
   }
 
   async function handleRemoveStudent(membershipId: string) {
-    if (!window.confirm('¿Quitar a este alumno de la gira?')) return
+    if (!window.confirm('¿Quitar a este alumno del grupo?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
     if (res.ok) {
-      toast.success('Alumno quitado de la gira.')
+      toast.success('Alumno quitado del grupo.')
       void load()
     } else {
       const data = await res.json().catch(() => null)
@@ -433,11 +432,11 @@ export default function AdminTripDetailPage() {
     if (res.ok) {
       const data = await res.json()
       setCreatedCredentials({ email: data.email, password: data.password })
-      toast.success('Monitor agregado.')
+      toast.success('Coordinador agregado.')
       void load()
     } else {
       const data = await res.json().catch(() => null)
-      const message = data?.error?.message ?? 'No se pudo agregar al monitor.'
+      const message = data?.error?.message ?? 'No se pudo agregar al coordinador.'
       setAddMonitorError(message)
       toast.error(message)
     }
@@ -455,7 +454,7 @@ export default function AdminTripDetailPage() {
   if (!trip) {
     return (
       <>
-        <SiteHeader title="Gira" />
+        <SiteHeader title="Grupo" />
         <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
           <Skeleton className="h-24 w-full" />
           <Skeleton className="h-64 w-full" />
@@ -479,17 +478,17 @@ export default function AdminTripDetailPage() {
             <DialogTrigger asChild>
               <Button variant="outline" size="xs" onClick={openEditDialog}>
                 <PencilIcon />
-                Editar gira
+                Editar grupo
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Editar gira</DialogTitle>
+                <DialogTitle>Editar grupo</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="flex flex-col gap-2">
-                    <Label htmlFor="edit-name">Nombre de la gira</Label>
+                    <Label htmlFor="edit-name">Nombre del grupo</Label>
                     <Input
                       id="edit-name"
                       value={editForm.name}
@@ -523,7 +522,7 @@ export default function AdminTripDetailPage() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label>Fechas de la gira</Label>
+                  <Label>Fechas del grupo</Label>
                   <DateRangePicker value={editDateRange} onChange={setEditDateRange} />
                   {editDateRange?.from && editDateRange?.to ? (
                     <p className="text-xs text-muted-foreground">
@@ -711,7 +710,7 @@ export default function AdminTripDetailPage() {
                         />
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Agrega las actividades del programa al itinerario de esta gira, sin tocar los ítems
+                        Agrega las actividades del programa al itinerario de este grupo, sin tocar los ítems
                         que ya existen.
                       </p>
                       {applyProgramError ? (
@@ -743,7 +742,7 @@ export default function AdminTripDetailPage() {
                   .map(([day, items]) => (
                     <div key={day} className="flex flex-col gap-3">
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        Día {day} · {format(dayDate(trip.startDate, Number(day)), 'd MMM', { locale: es })}
+                        Día {day} · {format(dayDate(trip.startDate, Number(day)), 'EEEE d MMM', { locale: es })}
                       </p>
                       {items.map((item) => (
                         <div
@@ -876,7 +875,7 @@ export default function AdminTripDetailPage() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Invitar alumno a esta gira</DialogTitle>
+                  <DialogTitle>Invitar alumno a este grupo</DialogTitle>
                 </DialogHeader>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="student-email">Correo electrónico</Label>
@@ -889,7 +888,7 @@ export default function AdminTripDetailPage() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Se enviará una invitación por correo. Al registrarse con ese enlace, queda asociado a
-                    esta gira con acceso de solo lectura (itinerario, ubicación y comunicados).
+                    este grupo con acceso de solo lectura (itinerario, ubicación y comunicados).
                   </p>
                   {inviteStudentError ? <p className="text-sm text-destructive">{inviteStudentError}</p> : null}
                 </div>
@@ -919,7 +918,7 @@ export default function AdminTripDetailPage() {
               <EmptyState
                 icon={UsersIcon}
                 title="Sin alumnos invitados todavía."
-                description="Invita a un alumno por correo para darle acceso de solo lectura a esta gira."
+                description="Invita a un alumno por correo para darle acceso de solo lectura a este grupo."
               />
             )}
           </CardContent>
@@ -927,24 +926,24 @@ export default function AdminTripDetailPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Monitores ({monitors.length})</CardTitle>
+            <CardTitle>Coordinadores ({monitors.length})</CardTitle>
             <Dialog open={addMonitorOpen} onOpenChange={setAddMonitorOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm" onClick={openAddMonitor}>
                   <UserPlusIcon />
-                  Agregar monitor
+                  Agregar coordinador
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 {createdCredentials ? (
                   <>
                     <DialogHeader>
-                      <DialogTitle>Monitor agregado</DialogTitle>
+                      <DialogTitle>Coordinador agregado</DialogTitle>
                     </DialogHeader>
                     {createdCredentials.password ? (
                       <div className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                          Comparte estas credenciales con el monitor. La contraseña no se volverá a mostrar.
+                          Comparte estas credenciales con el coordinador. La contraseña no se volverá a mostrar.
                         </p>
                         <div className="flex flex-col gap-1 rounded-md border bg-muted/50 p-3 font-mono text-sm">
                           <span>{createdCredentials.email}</span>
@@ -957,7 +956,7 @@ export default function AdminTripDetailPage() {
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        {createdCredentials.email} ya tenía una cuenta y quedó asociado a esta gira.
+                        {createdCredentials.email} ya tenía una cuenta y quedó asociado a este grupo.
                       </p>
                     )}
                     <DialogFooter>
@@ -967,7 +966,7 @@ export default function AdminTripDetailPage() {
                 ) : (
                   <>
                     <DialogHeader>
-                      <DialogTitle>Agregar monitor a esta gira</DialogTitle>
+                      <DialogTitle>Agregar coordinador a este grupo</DialogTitle>
                     </DialogHeader>
                     <div className="flex flex-col gap-4">
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1000,7 +999,7 @@ export default function AdminTripDetailPage() {
                       </div>
                       <p className="text-xs text-muted-foreground">
                         Se crea la cuenta al tiro con una contraseña generada. Si el correo ya tiene cuenta,
-                        solo se asocia a esta gira.
+                        solo se asocia a este grupo.
                       </p>
                       {addMonitorError ? <p className="text-sm text-destructive">{addMonitorError}</p> : null}
                     </div>
@@ -1032,15 +1031,15 @@ export default function AdminTripDetailPage() {
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => handleRemoveMonitor(monitor.id)}>
                     <UserMinusIcon className="size-4" />
-                    <span className="sr-only">Quitar monitor</span>
+                    <span className="sr-only">Quitar coordinador</span>
                   </Button>
                 </div>
               ))
             ) : (
               <EmptyState
                 icon={UsersIcon}
-                title="Sin monitores asignados todavía."
-                description="Agrega un monitor para que pueda gestionar esta gira desde la app."
+                title="Sin coordinadores asignados todavía."
+                description="Agrega un coordinador para que pueda gestionar este grupo desde la app."
               />
             )}
           </CardContent>
@@ -1057,7 +1056,7 @@ export default function AdminTripDetailPage() {
                 disabled={addingRole !== null}
               >
                 <UserPlusIcon />
-                {addingRole === 'MONITOR' ? 'Agregando…' : 'Agregar monitor'}
+                {addingRole === 'MONITOR' ? 'Agregando…' : 'Agregar coordinador'}
               </Button>
               <Button
                 variant="outline"
@@ -1100,7 +1099,7 @@ export default function AdminTripDetailPage() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">Sin códigos para esta gira todavía.</p>
+              <p className="text-sm text-muted-foreground">Sin códigos para este grupo todavía.</p>
             )}
           </CardContent>
         </Card>
@@ -1113,6 +1112,7 @@ export default function AdminTripDetailPage() {
         totalDays={trip.totalDays}
         activityTemplates={activityTemplates}
         editingItem={editingItem}
+        existingItems={itinerary}
         onSubmit={handleSaveItinerary}
       />
     </>

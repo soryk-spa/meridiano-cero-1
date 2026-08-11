@@ -71,7 +71,7 @@ export function CommandMenu() {
   return (
     <CommandDialog open={open} onOpenChange={handleOpenChange}>
       <CommandInput
-        placeholder="Buscar giras, colegios o códigos…"
+        placeholder="Buscar grupos, colegios o códigos…"
         value={query}
         onValueChange={setQuery}
       />
@@ -80,7 +80,7 @@ export function CommandMenu() {
           <CommandEmpty>Sin resultados.</CommandEmpty>
         ) : null}
         {trips.length > 0 ? (
-          <CommandGroup heading="Giras">
+          <CommandGroup heading="Grupos">
             {trips.map((trip) => (
               <CommandItem key={trip.id} value={trip.id} onSelect={() => go(`/admin/trips/${trip.id}`)}>
                 <IconRoute />

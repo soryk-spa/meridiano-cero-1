@@ -1,4 +1,12 @@
-import type { TripStatus, ItineraryStatus, AnnouncementType } from '@prisma/client'
+import type { TripStatus, ItineraryStatus, AnnouncementType, Role } from '@prisma/client'
+
+// "Monitor" se muestra como "Coordinador" en toda la UI — el valor Role.MONITOR
+// del enum y la ruta /monitor/[tripId] quedan igual por dentro, sin migración.
+export const roleLabels: Record<Role, string> = {
+  PARENT: 'Apoderado',
+  MONITOR: 'Coordinador',
+  STUDENT: 'Alumno',
+}
 
 export const tripStatusLabels: Record<TripStatus, string> = {
   IN_TRANSIT: 'En ruta',

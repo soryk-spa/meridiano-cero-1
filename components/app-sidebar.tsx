@@ -7,7 +7,6 @@ import {
   IconCalendarStats,
   IconClipboardList,
   IconDashboard,
-  IconDatabase,
   IconHelp,
   IconLayoutGrid,
   IconMap,
@@ -38,7 +37,7 @@ import {
 
 const navMainItems = [
   { title: "Dashboard", url: "/admin", icon: IconDashboard },
-  { title: "Giras", url: "/admin/trips", icon: IconRoute },
+  { title: "Grupos", url: "/admin/trips", icon: IconRoute },
   { title: "Mapa operativo", url: "/admin/map", icon: IconMap },
   { title: "Organizador", url: "/admin/schedule", icon: IconLayoutGrid },
   { title: "Reportes", url: "/admin/reports", icon: IconReport },
@@ -51,7 +50,6 @@ const contentItems = [
 ]
 
 const managementItems = [
-  { name: "Colegios", url: "/admin/schools", icon: IconDatabase },
   { name: "Códigos", url: "/admin/codes", icon: IconTicket },
   { name: "Equipo", url: "/admin/team", icon: IconUsers },
   { name: "Usuarios", url: "/admin/users", icon: IconUserCog },
@@ -102,7 +100,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain
           items={navMain}
-          quickAction={{ title: "Nueva gira", url: "/admin/trips/new", icon: IconMapPinPlus }}
+          quickAction={{ title: "Nuevo grupo", url: "/admin/trips/new", icon: IconMapPinPlus }}
         />
         <NavDocuments label="Contenido" items={contentItems} />
         <NavDocuments label="Gestión" items={managementItems} />

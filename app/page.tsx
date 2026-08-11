@@ -4,6 +4,7 @@ import { auth } from '@clerk/nextjs/server'
 import { SignIn } from '@clerk/nextjs'
 import { prisma } from '@/lib/db'
 import { authAppearance } from '@/lib/clerk-appearance'
+import { roleLabels } from '@/lib/labels'
 
 export default async function RootPage() {
   const { userId } = await auth()
@@ -34,7 +35,7 @@ export default async function RootPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-2">
-        <h1 className="text-lg font-semibold text-center mb-4">Selecciona una gira</h1>
+        <h1 className="text-lg font-semibold text-center mb-4">Selecciona un grupo</h1>
         {memberships.map((membership) => (
           <Link
             key={membership.id}
@@ -43,7 +44,7 @@ export default async function RootPage() {
           >
             <p className="font-medium text-sm">{membership.trip.name}</p>
             <p className="text-xs text-muted-foreground">
-              {membership.role === 'MONITOR' ? 'Monitor' : 'Apoderado'}
+              {roleLabels[membership.role]}
             </p>
           </Link>
         ))}

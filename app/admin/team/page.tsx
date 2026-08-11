@@ -93,7 +93,7 @@ export default function AdminTeamPage() {
   }
 
   async function handleRemoveMonitorTrip(tripId: string, membershipId: string) {
-    if (!window.confirm('¿Quitar a este monitor de la gira?')) return
+    if (!window.confirm('¿Quitar a este coordinador del grupo?')) return
     const res = await fetch(`/api/v1/trips/${tripId}/roster/${membershipId}`, { method: 'DELETE' })
     if (res.ok) void load()
   }
@@ -102,7 +102,7 @@ export default function AdminTeamPage() {
     <>
       <SiteHeader
         title="Equipo"
-        subtitle="Administradores y monitores de la plataforma"
+        subtitle="Administradores y coordinadores de la plataforma"
         right={
           <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
             <DialogTrigger asChild>
@@ -146,7 +146,7 @@ export default function AdminTeamPage() {
         <Tabs defaultValue={defaultTab}>
           <TabsList>
             <TabsTrigger value="admins">Administradores</TabsTrigger>
-            <TabsTrigger value="monitors">Monitores</TabsTrigger>
+            <TabsTrigger value="monitors">Coordinadores</TabsTrigger>
           </TabsList>
 
           <TabsContent value="admins" className="mt-4">
@@ -215,7 +215,7 @@ export default function AdminTeamPage() {
                               className="rounded-full p-0.5 hover:bg-foreground/10"
                             >
                               <XIcon className="size-3" />
-                              <span className="sr-only">Quitar de esta gira</span>
+                              <span className="sr-only">Quitar de este grupo</span>
                             </button>
                           </Badge>
                         ))}
@@ -223,7 +223,7 @@ export default function AdminTeamPage() {
                     </div>
                   ))
                 ) : (
-                  <p className="p-3 text-sm text-muted-foreground">Sin monitores asignados.</p>
+                  <p className="p-3 text-sm text-muted-foreground">Sin coordinadores asignados.</p>
                 )}
               </CardContent>
             </Card>

@@ -88,7 +88,7 @@ export default function AdminProgramsPage() {
   }
 
   async function handleDelete(program: ProgramRow) {
-    if (!window.confirm(`¿Eliminar el programa "${program.name}"? Las giras que ya lo aplicaron no se ven afectadas.`)) {
+    if (!window.confirm(`¿Eliminar el programa "${program.name}"? Los grupos que ya lo aplicaron no se ven afectados.`)) {
       return
     }
     const res = await fetch(`/api/v1/admin/programs/${program.id}`, { method: 'DELETE' })
@@ -105,7 +105,7 @@ export default function AdminProgramsPage() {
     <>
       <SiteHeader
         title="Programas"
-        subtitle="Itinerarios reutilizables que se asignan a una o más giras"
+        subtitle="Itinerarios reutilizables que se asignan a uno o más grupos"
         right={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
@@ -160,7 +160,7 @@ export default function AdminProgramsPage() {
                   <TableHead>Nombre</TableHead>
                   <TableHead>Descripción</TableHead>
                   <TableHead>Actividades</TableHead>
-                  <TableHead>Giras asignadas</TableHead>
+                  <TableHead>Grupos asignados</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -208,7 +208,7 @@ export default function AdminProgramsPage() {
                       <EmptyState
                         icon={CalendarRangeIcon}
                         title="Sin programas todavía."
-                        description="Crea un programa reutilizable para poblar el itinerario de una gira automáticamente."
+                        description="Crea un programa reutilizable para poblar el itinerario de un grupo automáticamente."
                       />
                     </TableCell>
                   </TableRow>

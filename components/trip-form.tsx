@@ -1,13 +1,12 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { PlusIcon, RefreshCwIcon, XIcon } from "lucide-react"
 import { differenceInCalendarDays } from "date-fns"
 import type { DateRange } from "react-day-picker"
 import type { Trip } from "@prisma/client"
 
 import { Button } from "@/components/ui/button"
-import { Combobox } from "@/components/ui/combobox"
 import { DateRangePicker } from "@/components/date-range-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,13 +23,17 @@ import { generateAccessCode } from "@/lib/generate-code"
 const CUSTOM_DESTINATION = "custom"
 
 type ProgramOption = { id: string; name: string }
-type SchoolOption = { id: string; name: string }
 type ExtraLeg = { key: string; destinationId: string }
 
 const EMPTY_FORM = {
   name: "",
+  school: "",
+  curso: "",
   destination: "",
-  studentCount: "",
+  studentCountMale: "",
+  studentCountFemale: "",
+  companionCountMale: "",
+  companionCountFemale: "",
   initialLat: "",
   initialLng: "",
   hotel: "",
@@ -38,8 +41,10 @@ const EMPTY_FORM = {
   monitorCode: "",
 }
 
+const LAST_SCHOOL_STORAGE_KEY = "meridiano-cero:last-school-name"
+
 /**
- * Shared by the "Nueva gira" Sheet (components/create-trip-sheet.tsx) and the
+ * Shared by the "Nuevo grupo" Sheet (components/create-trip-sheet.tsx) and the
  * standalone /admin/trips/new page — the only real differences between the two
  * are the wrapping chrome (Sheet vs full page) and what happens on success, both
  * handled by the caller via `className`/`onSuccess`. The submit button lives
@@ -58,14 +63,13 @@ export function TripForm({
   onStateChange?: (state: { canSubmit: boolean; submitting: boolean }) => void
 }) {
   const [form, setForm] = useState(EMPTY_FORM)
+  const [nameManuallyEdited, setNameManuallyEdited] = useState(false)
   const [destinationId, setDestinationId] = useState("")
   const [dateRange, setDateRange] = useState<DateRange | undefined>()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
   const [programId, setProgramId] = useState("")
-  const [schools, setSchools] = useState<SchoolOption[]>([])
-  const [schoolId, setSchoolId] = useState("")
   const [extraLegs, setExtraLegs] = useState<ExtraLeg[]>([])
   const legKeyCounter = useRef(0)
 
@@ -73,22 +77,29 @@ export function TripForm({
     fetch("/api/v1/admin/programs")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => data && setPrograms(data.programs))
-    fetch("/api/v1/admin/schools")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data && setSchools(data.schools))
+    const id = window.setTimeout(() => {
+      const lastSchool = window.localStorage.getItem(LAST_SCHOOL_STORAGE_KEY)
+      if (lastSchool) setForm((p) => ({ ...p, school: lastSchool }))
+    }, 0)
+    return () => window.clearTimeout(id)
   }, [])
 
-  async function handleCreateSchool(name: string) {
-    const res = await fetch("/api/v1/admin/schools", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    })
-    if (res.ok) {
-      const { school } = await res.json()
-      setSchools((p) => [...p, school])
-      setSchoolId(school.id)
-    }
+  function handleSchoolChange(name: string) {
+    setForm((p) => ({ ...p, school: name }))
+  }
+
+  const autoName = useMemo(() => {
+    const programName = programs.find((p) => p.id === programId)?.name
+    const year = dateRange?.from?.getFullYear()
+    return [form.school.trim(), form.curso.trim(), programName, year].filter(Boolean).join(" ")
+  }, [form.school, form.curso, programs, programId, dateRange])
+
+  // Adjusting state during render (rather than in an effect) avoids an extra
+  // post-paint render pass — see https://react.dev/learn/you-might-not-need-an-effect.
+  const [prevAutoName, setPrevAutoName] = useState(autoName)
+  if (autoName !== prevAutoName) {
+    setPrevAutoName(autoName)
+    if (!nameManuallyEdited) setForm((p) => ({ ...p, name: autoName }))
   }
 
   const isCustomDestination = destinationId === CUSTOM_DESTINATION
@@ -140,15 +151,22 @@ export function TripForm({
             ...resolvedExtraLegs.map((d) => ({ label: d.label, lat: d.lat, lng: d.lng })),
           ]
         : undefined
+    const studentCountMale = Number(form.studentCountMale) || 0
+    const studentCountFemale = Number(form.studentCountFemale) || 0
     const res = await fetch("/api/v1/trips", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...form,
-        schoolId,
+        curso: form.curso.trim() || undefined,
+        school: form.school.trim(),
         startDate: dateRange.from.toISOString(),
         endDate: dateRange.to.toISOString(),
-        studentCount: Number(form.studentCount),
+        studentCount: studentCountMale + studentCountFemale,
+        studentCountMale,
+        studentCountFemale,
+        companionCountMale: form.companionCountMale ? Number(form.companionCountMale) : undefined,
+        companionCountFemale: form.companionCountFemale ? Number(form.companionCountFemale) : undefined,
         initialLat: Number(form.initialLat),
         initialLng: Number(form.initialLng),
         hotel: form.hotel.trim() || undefined,
@@ -159,12 +177,15 @@ export function TripForm({
     setSubmitting(false)
     if (res.ok) {
       const { trip } = await res.json()
+      window.localStorage.setItem(LAST_SCHOOL_STORAGE_KEY, form.school.trim())
       onSuccess(trip)
     } else {
       const data = await res.json().catch(() => null)
-      setError(data?.error?.message ?? "No se pudo crear la gira.")
+      setError(data?.error?.message ?? "No se pudo crear el grupo.")
     }
   }
+
+  const totalStudents = (Number(form.studentCountMale) || 0) + (Number(form.studentCountFemale) || 0)
 
   const canSubmit =
     !submitting &&
@@ -175,7 +196,8 @@ export function TripForm({
     form.initialLat !== "" &&
     form.initialLng !== "" &&
     !!programId &&
-    !!schoolId
+    !!form.school.trim() &&
+    totalStudents > 0
 
   useEffect(() => {
     onStateChange?.({ canSubmit, submitting })
@@ -193,24 +215,37 @@ export function TripForm({
         }}
       >
         <div className="flex flex-col gap-2">
-          <Label htmlFor="name">Nombre de la gira</Label>
+          <Label htmlFor="school">Colegio</Label>
           <Input
-            id="name"
-            placeholder="Nombre de la gira"
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+            id="school"
+            placeholder="Nombre del colegio"
+            value={form.school}
+            onChange={(e) => handleSchoolChange(e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-2">
-          <Label>Colegio</Label>
-          <Combobox
-            options={schools.map((s) => ({ value: s.id, label: s.name }))}
-            value={schoolId || null}
-            onSelect={(v) => setSchoolId(v ?? "")}
-            placeholder="Elegir o crear un colegio…"
-            emptyLabel="Sin colegios registrados."
-            onCreate={handleCreateSchool}
+          <Label htmlFor="curso">Curso</Label>
+          <Input
+            id="curso"
+            placeholder="Ej: 4to Medio B"
+            value={form.curso}
+            onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))}
           />
+        </div>
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <Label htmlFor="name">Nombre del grupo</Label>
+          <Input
+            id="name"
+            placeholder="Se genera automáticamente con colegio, curso, programa y año"
+            value={form.name}
+            onChange={(e) => {
+              setNameManuallyEdited(true)
+              setForm((p) => ({ ...p, name: e.target.value }))
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Se autogenera a partir del colegio, curso, programa y año — puedes sobrescribirlo.
+          </p>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -294,7 +329,7 @@ export function TripForm({
         </div>
 
         <div className="flex flex-col gap-2 sm:col-span-2">
-          <Label>Fechas de la gira</Label>
+          <Label>Fechas del grupo</Label>
           <DateRangePicker value={dateRange} onChange={setDateRange} />
           {totalDays ? (
             <p className="text-xs text-muted-foreground">
@@ -303,15 +338,40 @@ export function TripForm({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="studentCount">N° de alumnos</Label>
-          <Input
-            id="studentCount"
-            type="number"
-            placeholder="N° de alumnos"
-            value={form.studentCount}
-            onChange={(e) => setForm((p) => ({ ...p, studentCount: e.target.value }))}
-          />
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <Label>Alumnos por género</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              type="number"
+              placeholder="Alumnos"
+              value={form.studentCountMale}
+              onChange={(e) => setForm((p) => ({ ...p, studentCountMale: e.target.value }))}
+            />
+            <Input
+              type="number"
+              placeholder="Alumnas"
+              value={form.studentCountFemale}
+              onChange={(e) => setForm((p) => ({ ...p, studentCountFemale: e.target.value }))}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">Total: {totalStudents} alumno{totalStudents === 1 ? "" : "s"}</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:col-span-2">
+          <Label>Acompañantes por género (opcional)</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              type="number"
+              placeholder="Hombres"
+              value={form.companionCountMale}
+              onChange={(e) => setForm((p) => ({ ...p, companionCountMale: e.target.value }))}
+            />
+            <Input
+              type="number"
+              placeholder="Mujeres"
+              value={form.companionCountFemale}
+              onChange={(e) => setForm((p) => ({ ...p, companionCountFemale: e.target.value }))}
+            />
+          </div>
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="hotel">Hotel (opcional)</Label>
@@ -374,11 +434,11 @@ export function TripForm({
           </div>
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="monitorCode">Código monitor</Label>
+          <Label htmlFor="monitorCode">Código coordinador</Label>
           <div className="flex gap-2">
             <Input
               id="monitorCode"
-              placeholder="Código monitor"
+              placeholder="Código coordinador"
               className="flex-1"
               value={form.monitorCode}
               onChange={(e) => setForm((p) => ({ ...p, monitorCode: e.target.value.toUpperCase() }))}

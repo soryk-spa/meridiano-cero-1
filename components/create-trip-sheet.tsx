@@ -32,14 +32,14 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
       <SheetTrigger asChild>
         <Button size="sm">
           <PlusIcon />
-          <span className="hidden lg:inline">Nueva gira</span>
+          <span className="hidden lg:inline">Nuevo grupo</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="flex flex-col">
         <SheetHeader className="gap-1">
-          <SheetTitle>Nueva gira</SheetTitle>
+          <SheetTitle>Nuevo grupo</SheetTitle>
           <SheetDescription>
-            Crea una gira y genera sus códigos de acceso para apoderados y monitor.
+            Crea un grupo y genera sus códigos de acceso para apoderados y coordinador.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-4 overflow-y-auto py-4 text-sm">
@@ -52,7 +52,7 @@ export function CreateTripSheet({ onCreated }: { onCreated: () => void }) {
         </div>
         <SheetFooter className="mt-auto flex gap-2 sm:flex-col sm:space-x-0">
           <Button type="submit" form={FORM_ID} className="w-full" disabled={!formState.canSubmit}>
-            {formState.submitting ? "Creando…" : "Crear gira"}
+            {formState.submitting ? "Creando…" : "Crear grupo"}
           </Button>
           <SheetClose asChild>
             <Button variant="outline" className="w-full">

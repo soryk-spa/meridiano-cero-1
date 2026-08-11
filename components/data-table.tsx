@@ -83,11 +83,11 @@ function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripN
     const res = await fetch(`/api/v1/trips/${tripId}`, { method: "DELETE" })
     setDeleting(false)
     if (res.ok) {
-      toast.success("Gira eliminada.")
+      toast.success("Grupo eliminado.")
       onDeleted()
     } else {
       const data = await res.json().catch(() => null)
-      toast.error(data?.error?.message ?? "No se pudo eliminar la gira.")
+      toast.error(data?.error?.message ?? "No se pudo eliminar el grupo.")
     }
   }
 
@@ -108,13 +108,13 @@ function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripN
         <DropdownMenuItem asChild>
           <Link href={`/admin/trips/${tripId}`}>
             <EyeIcon className="size-4" />
-            Ver gira
+            Ver grupo
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/admin/trips/${tripId}?edit=1`}>
             <PencilIcon className="size-4" />
-            Editar gira
+            Editar grupo
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -122,7 +122,7 @@ function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripN
           onSelect={handleDelete}
         >
           <Trash2Icon className="size-4" />
-          Eliminar gira
+          Eliminar grupo
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -166,7 +166,7 @@ function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
   },
   {
     id: "monitor",
-    header: "Monitor",
+    header: "Coordinador",
     cell: ({ row }) => row.original.monitorNames.join(", ") || "—",
   },
   {
@@ -176,7 +176,7 @@ function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
   },
   {
     id: "monitorCode",
-    header: "Código monitor",
+    header: "Código coordinador",
     cell: ({ row }) => <span className="font-mono text-xs">{codeFor(row.original, "MONITOR")}</span>,
   },
   {
@@ -244,7 +244,6 @@ export function DataTable({
               ["Operación", "all", null],
               ["En terreno", "active", data.filter((trip) => trip.status !== "FINISHED").length],
               ["Códigos", null, data.reduce((sum, trip) => sum + trip.accessCodes.length, 0)],
-              ["Colegios", null, new Set(data.map((trip) => trip.school.name)).size],
             ] as const
           ).map(([label, filterValue, count]) => (
             <Button
@@ -350,9 +349,9 @@ export function DataTable({
                 <TableCell colSpan={columns.length}>
                   <EmptyState
                     icon={RouteIcon}
-                    title={data.length ? "Sin resultados para estos filtros." : "Sin giras todavía."}
+                    title={data.length ? "Sin resultados para estos filtros." : "Sin grupos todavía."}
                     description={
-                      data.length ? "Prueba con otra búsqueda o colegio." : "Crea la primera gira para empezar."
+                      data.length ? "Prueba con otra búsqueda o colegio." : "Crea el primer grupo para empezar."
                     }
                   />
                 </TableCell>

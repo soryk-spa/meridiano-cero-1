@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { ArrowRightIcon, SearchIcon } from 'lucide-react'
+import { ArrowRightIcon } from 'lucide-react'
 import type { TripStatus } from '@prisma/client'
 import { SiteHeader } from '@/components/site-header'
 import { SectionCards } from '@/components/section-cards'
@@ -13,9 +13,8 @@ import { type TripRow } from '@/components/data-table'
 import StatusBadge from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { MultiSelectFilter } from '@/components/multi-select-filter'
+import { GlobalFilters } from '@/components/global-filters'
 import type { FleetMarker } from '@/components/FleetMapView'
 
 const FleetMapView = dynamic(() => import('@/components/FleetMapView'), { ssr: false })
@@ -29,6 +28,7 @@ type FleetTrip = {
   ping: { lat: number; lng: number; createdAt: string } | null
   initialLat: number
   initialLng: number
+  monitorNames: string[]
 }
 
 const STATUS_COLOR: Record<TripStatus, string> = {
@@ -41,9 +41,10 @@ const STATUS_COLOR: Record<TripStatus, string> = {
 export default function AdminPage() {
   const [trips, setTrips] = useState<TripRow[]>([])
   const [fleet, setFleet] = useState<FleetTrip[] | null>(null)
-  const [mapSearch, setMapSearch] = useState('')
-  const [mapSchoolFilter, setMapSchoolFilter] = useState<string[]>([])
-  const [mapDestinationFilter, setMapDestinationFilter] = useState<string[]>([])
+  const [search, setSearch] = useState('')
+  const [schoolFilter, setSchoolFilter] = useState<string[]>([])
+  const [destinationFilter, setDestinationFilter] = useState<string[]>([])
+  const [monitorFilter, setMonitorFilter] = useState<string[]>([])
 
   useEffect(() => {
     const id = window.setTimeout(async () => {
@@ -63,32 +64,41 @@ export default function AdminPage() {
     return () => window.clearTimeout(id)
   }, [])
 
-  const schoolCount = new Set(trips.map((t) => t.school.name)).size
+  const activeTripCount = trips.filter((t) => t.status !== 'FINISHED').length
   const codeCount = trips.reduce((sum, t) => sum + t.accessCodes.length, 0)
   const monitorCount = trips.reduce(
     (sum, t) => sum + t.accessCodes.filter((code) => code.role === 'MONITOR').length,
     0
   )
-  const recentTrips = trips.slice(0, 5)
 
-  const mapSchoolOptions = useMemo(
-    () => Array.from(new Set((fleet ?? []).map((trip) => trip.school))).sort(),
-    [fleet]
+  const schoolOptions = useMemo(() => Array.from(new Set(trips.map((t) => t.school.name))).sort(), [trips])
+  const destinationOptions = useMemo(() => Array.from(new Set(trips.map((t) => t.destination))).sort(), [trips])
+  const monitorOptions = useMemo(
+    () => Array.from(new Set(trips.flatMap((t) => t.monitorNames))).sort(),
+    [trips]
   )
-  const mapDestinationOptions = useMemo(
-    () => Array.from(new Set((fleet ?? []).map((trip) => trip.destination))).sort(),
-    [fleet]
+  const matchesFilters = useCallback(
+    (name: string, school: string, destination: string, monitorNames: string[]) => {
+      const query = search.trim().toLowerCase()
+      const matchesSearch = !query || name.toLowerCase().includes(query) || destination.toLowerCase().includes(query)
+      const matchesSchool = schoolFilter.length === 0 || schoolFilter.includes(school)
+      const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(destination)
+      const matchesMonitor = monitorFilter.length === 0 || monitorNames.some((name) => monitorFilter.includes(name))
+      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
+    },
+    [search, schoolFilter, destinationFilter, monitorFilter]
   )
-  const filteredFleet = useMemo(() => {
-    const query = mapSearch.trim().toLowerCase()
-    return (fleet ?? []).filter((trip) => {
-      const matchesSearch =
-        !query || trip.name.toLowerCase().includes(query) || trip.destination.toLowerCase().includes(query)
-      const matchesSchool = mapSchoolFilter.length === 0 || mapSchoolFilter.includes(trip.school)
-      const matchesDestination = mapDestinationFilter.length === 0 || mapDestinationFilter.includes(trip.destination)
-      return matchesSearch && matchesSchool && matchesDestination
-    })
-  }, [fleet, mapSearch, mapSchoolFilter, mapDestinationFilter])
+
+  const filteredTrips = useMemo(
+    () => trips.filter((trip) => matchesFilters(trip.name, trip.school.name, trip.destination, trip.monitorNames)),
+    [trips, matchesFilters]
+  )
+  const recentTrips = filteredTrips.slice(0, 5)
+
+  const filteredFleet = useMemo(
+    () => (fleet ?? []).filter((trip) => matchesFilters(trip.name, trip.school, trip.destination, trip.monitorNames)),
+    [fleet, matchesFilters]
+  )
 
   const markers: FleetMarker[] = filteredFleet.map((trip) => ({
     id: trip.id,
@@ -101,16 +111,31 @@ export default function AdminPage() {
 
   return (
     <>
-      <SiteHeader title="Dashboard" subtitle="Administración de giras" />
+      <SiteHeader title="Dashboard" subtitle="Administración de grupos" />
       <div className="flex flex-1 flex-col">
         <div className="@container/main flex flex-1 flex-col gap-2">
           <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
             <SectionCards
-              tripCount={trips.length}
+              activeTripCount={activeTripCount}
               codeCount={codeCount}
-              schoolCount={schoolCount}
               monitorCount={monitorCount}
             />
+            <div className="px-4 lg:px-6">
+              <GlobalFilters
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Buscar grupo o destino…"
+                schoolOptions={schoolOptions}
+                schoolFilter={schoolFilter}
+                onSchoolFilterChange={setSchoolFilter}
+                destinationOptions={destinationOptions}
+                destinationFilter={destinationFilter}
+                onDestinationFilterChange={setDestinationFilter}
+                monitorOptions={monitorOptions}
+                monitorFilter={monitorFilter}
+                onMonitorFilterChange={setMonitorFilter}
+              />
+            </div>
             <div className="px-4 lg:px-6">
               <Card className="overflow-hidden">
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -123,36 +148,11 @@ export default function AdminPage() {
                   </Button>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <div className="relative sm:w-56">
-                      <SearchIcon className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Buscar gira o destino…"
-                        value={mapSearch}
-                        onChange={(e) => setMapSearch(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                    <MultiSelectFilter
-                      options={mapSchoolOptions}
-                      selected={mapSchoolFilter}
-                      onChange={setMapSchoolFilter}
-                      placeholder="Colegio"
-                      className="sm:w-48"
-                    />
-                    <MultiSelectFilter
-                      options={mapDestinationOptions}
-                      selected={mapDestinationFilter}
-                      onChange={setMapDestinationFilter}
-                      placeholder="Destino"
-                      className="sm:w-48"
-                    />
-                  </div>
                   {markers.length ? (
                     <FleetMapView markers={markers} height="380px" />
                   ) : (
                     <div className="flex h-95 items-center justify-center rounded-lg border text-muted-foreground">
-                      {fleet && fleet.length > 0 ? 'Sin giras que coincidan con el filtro.' : 'Sin giras en terreno actualmente.'}
+                      {fleet && fleet.length > 0 ? 'Sin grupos que coincidan con el filtro.' : 'Sin grupos en terreno actualmente.'}
                     </div>
                   )}
                 </CardContent>
@@ -161,10 +161,10 @@ export default function AdminPage() {
             <div className="px-4 lg:px-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Giras recientes</CardTitle>
+                  <CardTitle>Grupos recientes</CardTitle>
                   <Button variant="outline" size="sm" asChild>
                     <Link href="/admin/trips">
-                      Ver todas
+                      Ver todos
                       <ArrowRightIcon />
                     </Link>
                   </Button>
@@ -178,7 +178,7 @@ export default function AdminPage() {
                         <TableHead>Estado</TableHead>
                         <TableHead>In-Out</TableHead>
                         <TableHead>Actividad actual</TableHead>
-                        <TableHead>Monitor</TableHead>
+                        <TableHead>Coordinador</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -210,7 +210,7 @@ export default function AdminPage() {
                       ) : (
                         <TableRow>
                           <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                            Sin giras todavía.
+                            Sin grupos todavía.
                           </TableCell>
                         </TableRow>
                       )}
