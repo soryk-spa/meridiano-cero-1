@@ -164,6 +164,7 @@ export default function AdminSchedulePage() {
                 <TableRow>
                   <TableHead className="sticky left-0 top-0 z-20 w-40 bg-background">Grupo</TableHead>
                   <TableHead className="sticky top-0 z-10 w-28 bg-background">Colegio</TableHead>
+                  <TableHead className="sticky top-0 z-10 w-24 bg-background">Ejecutivo</TableHead>
                   <TableHead className="sticky top-0 z-10 w-14 bg-background">Pax</TableHead>
                   <TableHead className="sticky top-0 z-10 w-28 bg-background">Hotel</TableHead>
                   <TableHead className="sticky top-0 z-10 w-28 bg-background">In-Out</TableHead>
@@ -220,6 +221,9 @@ export default function AdminSchedulePage() {
                           </TooltipTrigger>
                           <TooltipContent>{trip.school.name}</TooltipContent>
                         </Tooltip>
+                      </TableCell>
+                      <TableCell className="w-24 py-5 text-muted-foreground">
+                        <span className="block truncate">{trip.ejecutivo || '—'}</span>
                       </TableCell>
                       <TableCell className="w-14 py-5">{trip.studentCount}</TableCell>
                       <TableCell className="w-28 py-5 text-muted-foreground">
@@ -315,6 +319,10 @@ function TripDetailPopoverContent({ trip }: { trip: ScheduleTrip }) {
         <div>
           <p className="text-xs text-muted-foreground">Hotel</p>
           <p>{trip.hotel ?? '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Ejecutivo</p>
+          <p>{trip.ejecutivo ?? '—'}</p>
         </div>
       </div>
       {dayNumbers.length > 0 && (

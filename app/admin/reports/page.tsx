@@ -32,11 +32,12 @@ const TYPE_BADGE_VARIANT: Record<AnnouncementType, 'destructive' | 'secondary' |
 }
 
 function downloadCsv(trips: TripRow[]) {
-  const header = ['Nombre', 'Colegio', 'Destino', 'Estado', 'Día', 'Alumnos', 'Inicio', 'Término']
+  const header = ['Nombre', 'Colegio', 'Destino', 'Ejecutivo', 'Estado', 'Día', 'Alumnos', 'Inicio', 'Término']
   const rows = trips.map((trip) => [
     trip.name,
     trip.school.name,
     trip.destination,
+    trip.ejecutivo ?? '',
     trip.status,
     `${trip.currentDay}/${trip.totalDays}`,
     trip.studentCount,

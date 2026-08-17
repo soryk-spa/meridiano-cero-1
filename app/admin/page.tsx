@@ -215,6 +215,7 @@ export default function AdminPage() {
                         <TableHead>In-Out</TableHead>
                         <TableHead>Actividad actual</TableHead>
                         <TableHead>Coordinador</TableHead>
+                        <TableHead>Ejecutivo</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -240,12 +241,13 @@ export default function AdminPage() {
                               <TableCell className="text-muted-foreground">
                                 {trip.monitorNames.join(', ') || '—'}
                               </TableCell>
+                              <TableCell className="text-muted-foreground">{trip.ejecutivo || '—'}</TableCell>
                             </TableRow>
                           )
                         })
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                          <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                             Sin grupos todavía.
                           </TableCell>
                         </TableRow>
