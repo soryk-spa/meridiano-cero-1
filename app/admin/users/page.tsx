@@ -80,6 +80,7 @@ export default function AdminUsersPage() {
   const [schoolFilter, setSchoolFilter] = useState<string[]>([])
   const [destinationFilter, setDestinationFilter] = useState<string[]>([])
   const [groupFilter, setGroupFilter] = useState<string[]>([])
+  const [executiveFilter, setExecutiveFilter] = useState<string[]>([])
 
   useEffect(() => {
     const id = window.setTimeout(async () => {
@@ -92,6 +93,10 @@ export default function AdminUsersPage() {
   const schoolOptions = useMemo(() => Array.from(new Set(allTrips.map((t) => t.school.name))).sort(), [allTrips])
   const destinationOptions = useMemo(() => Array.from(new Set(allTrips.map((t) => t.destination))).sort(), [allTrips])
   const groupOptions = useMemo(() => Array.from(new Set(allTrips.map((t) => t.name))).sort(), [allTrips])
+  const executiveOptions = useMemo(
+    () => Array.from(new Set(allTrips.map((t) => t.ejecutivo).filter((v): v is string => !!v))).sort(),
+    [allTrips]
+  )
   const roleLabelOptions = useMemo(() => ROLE_OPTIONS.map((role) => roleLabels[role]), [])
   const labelToRole = useMemo(() => new Map(ROLE_OPTIONS.map((role) => [roleLabels[role], role])), [])
 
@@ -113,6 +118,7 @@ export default function AdminUsersPage() {
     for (const school of schoolFilter) params.append('school', school)
     for (const destination of destinationFilter) params.append('destination', destination)
     for (const group of groupFilter) params.append('group', group)
+    for (const executive of executiveFilter) params.append('executive', executive)
     const res = await fetch(`/api/v1/admin/users?${params}`)
     if (res.ok) {
       const data = await res.json()
@@ -123,7 +129,7 @@ export default function AdminUsersPage() {
       const data = await res.json().catch(() => null)
       setError(data?.error?.message ?? 'No se pudieron cargar los usuarios.')
     }
-  }, [offset, query, roleFilter, schoolFilter, destinationFilter, groupFilter, labelToRole])
+  }, [offset, query, roleFilter, schoolFilter, destinationFilter, groupFilter, executiveFilter, labelToRole])
 
   useEffect(() => {
     const id = window.setTimeout(() => {
@@ -224,6 +230,9 @@ export default function AdminUsersPage() {
             destinationOptions={destinationOptions}
             destinationFilter={destinationFilter}
             onDestinationFilterChange={updateFilter(setDestinationFilter)}
+            executiveOptions={executiveOptions}
+            executiveFilter={executiveFilter}
+            onExecutiveFilterChange={updateFilter(setExecutiveFilter)}
           />
         </div>
 

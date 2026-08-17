@@ -7,6 +7,7 @@ import {
   CalendarRangeIcon,
   CheckIcon,
   CopyIcon,
+  GripVerticalIcon,
   MailPlusIcon,
   MessageSquareIcon,
   PencilIcon,
@@ -16,6 +17,7 @@ import {
   UserPlusIcon,
   UsersIcon,
 } from 'lucide-react'
+import { Sortable, SortableItem, SortableItemHandle } from '@/components/reui/sortable'
 import { addDays, differenceInCalendarDays, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { toast } from 'sonner'
@@ -74,6 +76,15 @@ const STATUS_OPTIONS: TripStatus[] = ['IN_ACTIVITY', 'RESTING', 'FINISHED']
 
 function dayDate(startDate: string | Date, dayNumber: number) {
   return addDays(new Date(startDate), dayNumber - 1)
+}
+
+// `time` is free text (e.g. "09:00"), not a validated time input — parse
+// defensively and push anything unparseable to the end rather than let it
+// throw off the sort.
+function parseTimeMinutes(time: string): number {
+  const match = time.match(/^(\d{1,2}):(\d{2})/)
+  if (!match) return Number.POSITIVE_INFINITY
+  return Number(match[1]) * 60 + Number(match[2])
 }
 
 const EMPTY_EDIT_FORM = { name: '', destination: '', studentCount: '', hotel: '' }
@@ -307,6 +318,47 @@ export default function AdminTripDetailPage() {
       const data = await res.json().catch(() => null)
       toast.error(data?.error?.message ?? 'No se pudo eliminar el ítem.')
     }
+  }
+
+  // `order` is a single sequence shared across the whole trip (not scoped per
+  // day), so a drag within one day's list must reuse that day's own original
+  // order AND time values in their new sequence rather than renumbering
+  // everything — otherwise it would collide with or shift items on other days.
+  // Reusing the day's own time slots the same way means dragging an activity
+  // to a new position also gives it the time that belonged to that slot, so
+  // the displayed order and the clock times never disagree.
+  function handleReorderDay(newDayItems: ItineraryItem[]) {
+    const orderSlots = newDayItems.map((item) => item.order).sort((a, b) => a - b)
+    const timeSlots = newDayItems.map((item) => item.time).sort((a, b) => parseTimeMinutes(a) - parseTimeMinutes(b))
+    const changed: { id: string; order: number; time: string }[] = []
+    const reordered = newDayItems.map((item, idx) => {
+      const order = orderSlots[idx]
+      const time = timeSlots[idx]
+      const isChanged = order !== item.order || time !== item.time
+      if (isChanged) changed.push({ id: item.id, order, time })
+      return isChanged ? { ...item, order, time } : item
+    })
+    if (changed.length === 0) return
+
+    setItinerary((prev) => {
+      const byId = new Map(reordered.map((item) => [item.id, item]))
+      return prev.map((item) => byId.get(item.id) ?? item).sort((a, b) => a.order - b.order)
+    })
+
+    void Promise.all(
+      changed.map((c) =>
+        fetch(`/api/v1/trips/${tripId}/itinerary/${c.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: c.order, time: c.time }),
+        })
+      )
+    ).then((responses) => {
+      if (responses.some((r) => !r.ok)) {
+        toast.error('No se pudo guardar el nuevo orden.')
+        void load()
+      }
+    })
   }
 
   function openApplyProgram() {
@@ -584,6 +636,12 @@ export default function AdminTripDetailPage() {
               <p className="text-xs text-muted-foreground">Destino</p>
               <p className="text-sm font-medium">{trip.destination}</p>
             </div>
+            {trip.ejecutivo ? (
+              <div className="pl-6">
+                <p className="text-xs text-muted-foreground">Ejecutivo</p>
+                <p className="text-sm font-medium">{trip.ejecutivo}</p>
+              </div>
+            ) : null}
             <div className="pl-6">
               <p className="text-xs text-muted-foreground">Fechas</p>
               <p className="text-sm font-medium">
@@ -744,44 +802,58 @@ export default function AdminTripDetailPage() {
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Día {day} · {format(dayDate(trip.startDate, Number(day)), 'EEEE d MMM', { locale: es })}
                       </p>
-                      {items.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-start justify-between gap-3 border-b pb-3 last:border-0 last:pb-0"
-                        >
-                          <div className="flex items-start gap-3">
-                            {item.photoUrl ? (
-                              <a href={item.photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                  src={item.photoUrl}
-                                  alt={item.title}
-                                  className="size-10 rounded-md border object-cover"
-                                />
-                              </a>
-                            ) : null}
-                            <div>
-                              <p className="text-sm font-medium">
-                                {item.time} · {item.title}
-                              </p>
-                              <p className="text-xs text-muted-foreground">{item.location}</p>
+                      <Sortable
+                        value={items}
+                        onValueChange={handleReorderDay}
+                        getItemValue={(item) => item.id}
+                        className="flex flex-col gap-3"
+                      >
+                        {items.map((item) => (
+                          <SortableItem
+                            key={item.id}
+                            value={item.id}
+                            className="flex items-start justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+                          >
+                            <div className="flex items-start gap-3">
+                              <SortableItemHandle className="mt-1 shrink-0 text-muted-foreground">
+                                <GripVerticalIcon className="size-4" />
+                              </SortableItemHandle>
+                              {item.photoUrl ? (
+                                <a href={item.photoUrl} target="_blank" rel="noreferrer" className="shrink-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={item.photoUrl}
+                                    alt={item.title}
+                                    className="size-10 rounded-md border object-cover"
+                                  />
+                                </a>
+                              ) : null}
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="font-mono text-[11px]">
+                                    {item.time}
+                                  </Badge>
+                                  <p className="text-sm font-medium">{item.title}</p>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">{item.location}</p>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              {itineraryStatusLabels[item.status]}
-                            </span>
-                            <Button variant="ghost" size="icon" onClick={() => openEditItinerary(item)}>
-                              <PencilIcon className="size-4" />
-                              <span className="sr-only">Editar ítem</span>
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteItinerary(item.id)}>
-                              <Trash2Icon className="size-4" />
-                              <span className="sr-only">Eliminar ítem</span>
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
+                            <div className="flex shrink-0 items-center gap-1">
+                              <span className="text-xs font-medium text-muted-foreground">
+                                {itineraryStatusLabels[item.status]}
+                              </span>
+                              <Button variant="ghost" size="icon" onClick={() => openEditItinerary(item)}>
+                                <PencilIcon className="size-4" />
+                                <span className="sr-only">Editar ítem</span>
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDeleteItinerary(item.id)}>
+                                <Trash2Icon className="size-4" />
+                                <span className="sr-only">Eliminar ítem</span>
+                              </Button>
+                            </div>
+                          </SortableItem>
+                        ))}
+                      </Sortable>
                     </div>
                   ))
               ) : (

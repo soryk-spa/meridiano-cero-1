@@ -72,6 +72,10 @@ function codeFor(trip: TripRow, role: "PARENT" | "MONITOR") {
   return trip.accessCodes.find((c) => c.role === role)?.code ?? "—"
 }
 
+function studentCodeCount(trip: TripRow) {
+  return trip.accessCodes.filter((c) => c.role === "STUDENT").length
+}
+
 function TripRowActions({ tripId, tripName, onDeleted }: { tripId: string; tripName: string; onDeleted: () => void }) {
   const [deleting, setDeleting] = React.useState(false)
 
@@ -170,6 +174,11 @@ function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
     cell: ({ row }) => row.original.monitorNames.join(", ") || "—",
   },
   {
+    accessorKey: "ejecutivo",
+    header: "Ejecutivo",
+    cell: ({ row }) => row.original.ejecutivo || "—",
+  },
+  {
     id: "parentCode",
     header: "Código apoderado",
     cell: ({ row }) => <span className="font-mono text-xs">{codeFor(row.original, "PARENT")}</span>,
@@ -178,6 +187,18 @@ function buildColumns(onTripDeleted: () => void): ColumnDef<TripRow>[] {
     id: "monitorCode",
     header: "Código coordinador",
     cell: ({ row }) => <span className="font-mono text-xs">{codeFor(row.original, "MONITOR")}</span>,
+  },
+  {
+    id: "studentCodes",
+    header: "Códigos alumno",
+    cell: ({ row }) => {
+      const count = studentCodeCount(row.original)
+      return (
+        <span className="text-xs text-muted-foreground">
+          {count > 0 ? `${count} generado${count === 1 ? "" : "s"}` : "Sin códigos"}
+        </span>
+      )
+    },
   },
   {
     id: "actions",

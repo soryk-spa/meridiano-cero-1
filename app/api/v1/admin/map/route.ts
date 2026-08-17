@@ -27,6 +27,7 @@ export const GET = withApiHandler(async () => {
     destination: trip.destination,
     status: trip.status,
     school: trip.school.name,
+    ejecutivo: trip.ejecutivo,
     ping: trip.locationPings[0] ?? null,
     initialLat: trip.initialLat,
     initialLng: trip.initialLng,

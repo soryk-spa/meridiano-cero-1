@@ -22,6 +22,7 @@ type ScheduleTrip = {
   name: string
   destination: string
   school: { name: string }
+  ejecutivo: string | null
   program: { name: string }
   studentCount: number
   hotel: string | null
@@ -53,6 +54,7 @@ export default function AdminSchedulePage() {
   const [schoolFilter, setSchoolFilter] = useState<string[]>([])
   const [destinationFilter, setDestinationFilter] = useState<string[]>([])
   const [monitorFilter, setMonitorFilter] = useState<string[]>([])
+  const [executiveFilter, setExecutiveFilter] = useState<string[]>([])
 
   const load = useCallback(async (from: Date, to: Date) => {
     setTrips(null)
@@ -87,6 +89,10 @@ export default function AdminSchedulePage() {
     () => Array.from(new Set((trips ?? []).flatMap((trip) => trip.monitorNames))).sort(),
     [trips]
   )
+  const executiveOptions = useMemo(
+    () => Array.from(new Set((trips ?? []).map((trip) => trip.ejecutivo).filter((v): v is string => !!v))).sort(),
+    [trips]
+  )
 
   const filteredTrips = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -96,9 +102,10 @@ export default function AdminSchedulePage() {
       const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(trip.destination)
       const matchesMonitor =
         monitorFilter.length === 0 || trip.monitorNames.some((name) => monitorFilter.includes(name))
-      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
+      const matchesExecutive = executiveFilter.length === 0 || (!!trip.ejecutivo && executiveFilter.includes(trip.ejecutivo))
+      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor && matchesExecutive
     })
-  }, [trips, search, schoolFilter, destinationFilter, monitorFilter])
+  }, [trips, search, schoolFilter, destinationFilter, monitorFilter, executiveFilter])
 
   const days = useMemo(() => {
     if (!filteredTrips.length || !dateRange?.from || !dateRange?.to) return []
@@ -130,6 +137,9 @@ export default function AdminSchedulePage() {
           monitorOptions={monitorOptions}
           monitorFilter={monitorFilter}
           onMonitorFilterChange={setMonitorFilter}
+          executiveOptions={executiveOptions}
+          executiveFilter={executiveFilter}
+          onExecutiveFilterChange={setExecutiveFilter}
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
         />

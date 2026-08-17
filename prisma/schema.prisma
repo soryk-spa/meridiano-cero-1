@@ -49,6 +49,7 @@ model Trip {
   id                   String     @id @default(cuid())
   name                 String
   curso                String?
+  ejecutivo            String?
   destination          String
   schoolId             String
   school               School     @relation(fields: [schoolId], references: [id])

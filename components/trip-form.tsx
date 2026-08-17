@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PlusIcon, RefreshCwIcon, XIcon } from "lucide-react"
 import { differenceInCalendarDays } from "date-fns"
 import type { DateRange } from "react-day-picker"
@@ -29,6 +29,7 @@ const EMPTY_FORM = {
   name: "",
   school: "",
   curso: "",
+  ejecutivo: "",
   destination: "",
   studentCountMale: "",
   studentCountFemale: "",
@@ -39,6 +40,7 @@ const EMPTY_FORM = {
   hotel: "",
   parentCode: "",
   monitorCode: "",
+  studentCode: "",
 }
 
 const LAST_SCHOOL_STORAGE_KEY = "meridiano-cero:last-school-name"
@@ -69,20 +71,31 @@ export function TripForm({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [programs, setPrograms] = useState<ProgramOption[]>([])
+  const [programsError, setProgramsError] = useState<string | null>(null)
   const [programId, setProgramId] = useState("")
   const [extraLegs, setExtraLegs] = useState<ExtraLeg[]>([])
   const legKeyCounter = useRef(0)
 
+  const loadPrograms = useCallback(async () => {
+    setProgramsError(null)
+    try {
+      const res = await fetch("/api/v1/admin/programs")
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setPrograms(data.programs)
+    } catch {
+      setProgramsError("No se pudieron cargar los programas. Intenta de nuevo.")
+    }
+  }, [])
+
   useEffect(() => {
-    fetch("/api/v1/admin/programs")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => data && setPrograms(data.programs))
     const id = window.setTimeout(() => {
+      void loadPrograms()
       const lastSchool = window.localStorage.getItem(LAST_SCHOOL_STORAGE_KEY)
       if (lastSchool) setForm((p) => ({ ...p, school: lastSchool }))
     }, 0)
     return () => window.clearTimeout(id)
-  }, [])
+  }, [loadPrograms])
 
   function handleSchoolChange(name: string) {
     setForm((p) => ({ ...p, school: name }))
@@ -159,6 +172,7 @@ export function TripForm({
       body: JSON.stringify({
         ...form,
         curso: form.curso.trim() || undefined,
+        ejecutivo: form.ejecutivo.trim() || undefined,
         school: form.school.trim(),
         startDate: dateRange.from.toISOString(),
         endDate: dateRange.to.toISOString(),
@@ -230,6 +244,15 @@ export function TripForm({
             placeholder="Ej: 4to Medio B"
             value={form.curso}
             onChange={(e) => setForm((p) => ({ ...p, curso: e.target.value }))}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="ejecutivo">Ejecutivo</Label>
+          <Input
+            id="ejecutivo"
+            placeholder="Nombre del ejecutivo de ventas"
+            value={form.ejecutivo}
+            onChange={(e) => setForm((p) => ({ ...p, ejecutivo: e.target.value }))}
           />
         </div>
         <div className="flex flex-col gap-2 sm:col-span-2">
@@ -321,11 +344,20 @@ export function TripForm({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
-            {programs.length
-              ? "El itinerario se completa automáticamente con las actividades de este programa."
-              : "Primero crea un programa en /admin/programs."}
-          </p>
+          {programsError ? (
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-destructive">{programsError}</p>
+              <Button type="button" variant="ghost" size="sm" className="h-auto p-0 text-xs underline" onClick={() => void loadPrograms()}>
+                Reintentar
+              </Button>
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {programs.length
+                ? "El itinerario se completa automáticamente con las actividades de este programa."
+                : "Primero crea un programa en /admin/programs."}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2 sm:col-span-2">
@@ -453,6 +485,30 @@ export function TripForm({
               <span className="sr-only">Generar código</span>
             </Button>
           </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="studentCode">Código alumno</Label>
+          <div className="flex gap-2">
+            <Input
+              id="studentCode"
+              placeholder="Código alumno"
+              className="flex-1"
+              value={form.studentCode}
+              onChange={(e) => setForm((p) => ({ ...p, studentCode: e.target.value.toUpperCase() }))}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setForm((p) => ({ ...p, studentCode: generateAccessCode() }))}
+            >
+              <RefreshCwIcon className="size-4" />
+              <span className="sr-only">Generar código</span>
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Puedes generar más códigos de alumno desde la ficha del grupo una vez creado.
+          </p>
         </div>
       </form>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}

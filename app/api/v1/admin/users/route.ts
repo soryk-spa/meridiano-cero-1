@@ -17,8 +17,13 @@ export const GET = withApiHandler(async (request) => {
   const schoolFilter = url.searchParams.getAll('school')
   const destinationFilter = url.searchParams.getAll('destination')
   const groupFilter = url.searchParams.getAll('group')
+  const executiveFilter = url.searchParams.getAll('executive')
   const hasMembershipFilter =
-    roleFilter.length > 0 || schoolFilter.length > 0 || destinationFilter.length > 0 || groupFilter.length > 0
+    roleFilter.length > 0 ||
+    schoolFilter.length > 0 ||
+    destinationFilter.length > 0 ||
+    groupFilter.length > 0 ||
+    executiveFilter.length > 0
 
   let memberUserIds: string[] | undefined
   if (hasMembershipFilter) {
@@ -29,6 +34,7 @@ export const GET = withApiHandler(async (request) => {
           ...(schoolFilter.length ? { school: { name: { in: schoolFilter } } } : {}),
           ...(destinationFilter.length ? { destination: { in: destinationFilter } } : {}),
           ...(groupFilter.length ? { name: { in: groupFilter } } : {}),
+          ...(executiveFilter.length ? { ejecutivo: { in: executiveFilter } } : {}),
         },
       },
       select: { clerkUserId: true },

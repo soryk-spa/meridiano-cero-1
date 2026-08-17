@@ -40,6 +40,7 @@ const bodySchema = z
   .object({
     name: z.string().trim().min(1),
     curso: z.string().trim().min(1).optional(),
+    ejecutivo: z.string().trim().min(1).optional(),
     school: z.string().trim().min(1),
     destination: z.string().trim().min(1),
     startDate: z.iso.datetime(),
@@ -53,6 +54,7 @@ const bodySchema = z
     initialLng: z.number().min(-180).max(180),
     parentCode: z.string().trim().min(1),
     monitorCode: z.string().trim().min(1),
+    studentCode: z.string().trim().min(1),
     programId: z.string().trim().min(1),
     hotel: z.string().trim().min(1).optional(),
     legs: z
@@ -77,7 +79,7 @@ export const POST = withApiHandler(async (request) => {
   const parsed = bodySchema.safeParse(json)
   if (!parsed.success) throw new ApiError('VALIDATION_ERROR', 'Missing or invalid trip fields.')
 
-  const { school: schoolName, parentCode, monitorCode, programId, legs, ...tripData } = parsed.data
+  const { school: schoolName, parentCode, monitorCode, studentCode, programId, legs, ...tripData } = parsed.data
   const startDate = new Date(tripData.startDate)
   const endDate = new Date(tripData.endDate)
   const totalDays = differenceInCalendarDays(endDate, startDate) + 1
@@ -101,6 +103,7 @@ export const POST = withApiHandler(async (request) => {
         create: [
           { code: parentCode.toUpperCase(), role: Role.PARENT },
           { code: monitorCode.toUpperCase(), role: Role.MONITOR },
+          { code: studentCode.toUpperCase(), role: Role.STUDENT },
         ],
       },
       ...(legs && legs.length > 0

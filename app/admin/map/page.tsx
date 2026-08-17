@@ -19,6 +19,7 @@ type FleetTrip = {
   destination: string
   status: TripStatus
   school: string
+  ejecutivo: string | null
   ping: { lat: number; lng: number; createdAt: string } | null
   initialLat: number
   initialLng: number
@@ -40,6 +41,7 @@ export default function AdminMapPage() {
   const [schoolFilter, setSchoolFilter] = useState<string[]>([])
   const [destinationFilter, setDestinationFilter] = useState<string[]>([])
   const [monitorFilter, setMonitorFilter] = useState<string[]>([])
+  const [executiveFilter, setExecutiveFilter] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setError(null)
@@ -72,6 +74,10 @@ export default function AdminMapPage() {
     () => Array.from(new Set((fleet ?? []).flatMap((trip) => trip.monitorNames))).sort(),
     [fleet]
   )
+  const executiveOptions = useMemo(
+    () => Array.from(new Set((fleet ?? []).map((trip) => trip.ejecutivo).filter((v): v is string => !!v))).sort(),
+    [fleet]
+  )
 
   const filteredFleet = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -82,9 +88,10 @@ export default function AdminMapPage() {
       const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(trip.destination)
       const matchesMonitor =
         monitorFilter.length === 0 || trip.monitorNames.some((name) => monitorFilter.includes(name))
-      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
+      const matchesExecutive = executiveFilter.length === 0 || (!!trip.ejecutivo && executiveFilter.includes(trip.ejecutivo))
+      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor && matchesExecutive
     })
-  }, [fleet, search, schoolFilter, destinationFilter, monitorFilter])
+  }, [fleet, search, schoolFilter, destinationFilter, monitorFilter, executiveFilter])
 
   if (error && !fleet) {
     return (
@@ -132,6 +139,9 @@ export default function AdminMapPage() {
           monitorOptions={monitorOptions}
           monitorFilter={monitorFilter}
           onMonitorFilterChange={setMonitorFilter}
+          executiveOptions={executiveOptions}
+          executiveFilter={executiveFilter}
+          onExecutiveFilterChange={setExecutiveFilter}
         />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
           <Card className="overflow-hidden">

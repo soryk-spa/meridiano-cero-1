@@ -28,6 +28,9 @@ export function GlobalFilters({
   monitorOptions,
   monitorFilter,
   onMonitorFilterChange,
+  executiveOptions,
+  executiveFilter,
+  onExecutiveFilterChange,
   dateRange,
   onDateRangeChange,
 }: {
@@ -47,6 +50,9 @@ export function GlobalFilters({
   monitorOptions?: string[]
   monitorFilter?: string[]
   onMonitorFilterChange?: (value: string[]) => void
+  executiveOptions?: string[]
+  executiveFilter?: string[]
+  onExecutiveFilterChange?: (value: string[]) => void
   dateRange?: DateRange
   onDateRangeChange?: (range: DateRange | undefined) => void
 }) {
@@ -96,6 +102,15 @@ export function GlobalFilters({
           selected={monitorFilter ?? []}
           onChange={onMonitorFilterChange}
           placeholder="Coordinador"
+          className="sm:w-44"
+        />
+      ) : null}
+      {onExecutiveFilterChange ? (
+        <MultiSelectFilter
+          options={executiveOptions ?? []}
+          selected={executiveFilter ?? []}
+          onChange={onExecutiveFilterChange}
+          placeholder="Ejecutivo"
           className="sm:w-44"
         />
       ) : null}

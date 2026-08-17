@@ -25,6 +25,7 @@ type FleetTrip = {
   destination: string
   status: TripStatus
   school: string
+  ejecutivo: string | null
   ping: { lat: number; lng: number; createdAt: string } | null
   initialLat: number
   initialLng: number
@@ -45,6 +46,7 @@ export default function AdminPage() {
   const [schoolFilter, setSchoolFilter] = useState<string[]>([])
   const [destinationFilter, setDestinationFilter] = useState<string[]>([])
   const [monitorFilter, setMonitorFilter] = useState<string[]>([])
+  const [executiveFilter, setExecutiveFilter] = useState<string[]>([])
 
   useEffect(() => {
     const id = window.setTimeout(async () => {
@@ -64,39 +66,56 @@ export default function AdminPage() {
     return () => window.clearTimeout(id)
   }, [])
 
-  const activeTripCount = trips.filter((t) => t.status !== 'FINISHED').length
-  const codeCount = trips.reduce((sum, t) => sum + t.accessCodes.length, 0)
-  const monitorCount = trips.reduce(
-    (sum, t) => sum + t.accessCodes.filter((code) => code.role === 'MONITOR').length,
-    0
-  )
-
   const schoolOptions = useMemo(() => Array.from(new Set(trips.map((t) => t.school.name))).sort(), [trips])
   const destinationOptions = useMemo(() => Array.from(new Set(trips.map((t) => t.destination))).sort(), [trips])
   const monitorOptions = useMemo(
     () => Array.from(new Set(trips.flatMap((t) => t.monitorNames))).sort(),
     [trips]
   )
+  const executiveOptions = useMemo(
+    () => Array.from(new Set(trips.map((t) => t.ejecutivo).filter((v): v is string => !!v))).sort(),
+    [trips]
+  )
   const matchesFilters = useCallback(
-    (name: string, school: string, destination: string, monitorNames: string[]) => {
+    (name: string, school: string, destination: string, monitorNames: string[], ejecutivo: string | null) => {
       const query = search.trim().toLowerCase()
       const matchesSearch = !query || name.toLowerCase().includes(query) || destination.toLowerCase().includes(query)
       const matchesSchool = schoolFilter.length === 0 || schoolFilter.includes(school)
       const matchesDestination = destinationFilter.length === 0 || destinationFilter.includes(destination)
       const matchesMonitor = monitorFilter.length === 0 || monitorNames.some((name) => monitorFilter.includes(name))
-      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor
+      const matchesExecutive = executiveFilter.length === 0 || (!!ejecutivo && executiveFilter.includes(ejecutivo))
+      return matchesSearch && matchesSchool && matchesDestination && matchesMonitor && matchesExecutive
     },
-    [search, schoolFilter, destinationFilter, monitorFilter]
+    [search, schoolFilter, destinationFilter, monitorFilter, executiveFilter]
   )
 
   const filteredTrips = useMemo(
-    () => trips.filter((trip) => matchesFilters(trip.name, trip.school.name, trip.destination, trip.monitorNames)),
+    () =>
+      trips.filter((trip) =>
+        matchesFilters(trip.name, trip.school.name, trip.destination, trip.monitorNames, trip.ejecutivo)
+      ),
     [trips, matchesFilters]
   )
   const recentTrips = filteredTrips.slice(0, 5)
 
+  const activeTripCount = filteredTrips.filter((t) => t.status !== 'FINISHED').length
+  const codeCount = filteredTrips.reduce((sum, t) => sum + t.accessCodes.length, 0)
+  const monitorCount = filteredTrips.reduce(
+    (sum, t) => sum + t.accessCodes.filter((code) => code.role === 'MONITOR').length,
+    0
+  )
+
+  const totalStudentsMale = filteredTrips.reduce((sum, t) => sum + (t.studentCountMale ?? 0), 0)
+  const totalStudentsFemale = filteredTrips.reduce((sum, t) => sum + (t.studentCountFemale ?? 0), 0)
+  const totalCompanionsMale = filteredTrips.reduce((sum, t) => sum + (t.companionCountMale ?? 0), 0)
+  const totalCompanionsFemale = filteredTrips.reduce((sum, t) => sum + (t.companionCountFemale ?? 0), 0)
+  const totalPassengers = totalStudentsMale + totalStudentsFemale + totalCompanionsMale + totalCompanionsFemale
+
   const filteredFleet = useMemo(
-    () => (fleet ?? []).filter((trip) => matchesFilters(trip.name, trip.school, trip.destination, trip.monitorNames)),
+    () =>
+      (fleet ?? []).filter((trip) =>
+        matchesFilters(trip.name, trip.school, trip.destination, trip.monitorNames, trip.ejecutivo)
+      ),
     [fleet, matchesFilters]
   )
 
@@ -134,7 +153,24 @@ export default function AdminPage() {
                 monitorOptions={monitorOptions}
                 monitorFilter={monitorFilter}
                 onMonitorFilterChange={setMonitorFilter}
+                executiveOptions={executiveOptions}
+                executiveFilter={executiveFilter}
+                onExecutiveFilterChange={setExecutiveFilter}
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3 px-4 sm:grid-cols-4 lg:px-6">
+              <StatChip label="Total pasajeros" value={totalPassengers} />
+              <StatChip
+                label="Alumnos"
+                value={totalStudentsMale + totalStudentsFemale}
+                detail={`${totalStudentsMale} H · ${totalStudentsFemale} M`}
+              />
+              <StatChip
+                label="Acompañantes"
+                value={totalCompanionsMale + totalCompanionsFemale}
+                detail={`${totalCompanionsMale} H · ${totalCompanionsFemale} M`}
+              />
+              <StatChip label="Grupos filtrados" value={filteredTrips.length} />
             </div>
             <div className="px-4 lg:px-6">
               <Card className="overflow-hidden">
@@ -223,5 +259,15 @@ export default function AdminPage() {
         </div>
       </div>
     </>
+  )
+}
+
+function StatChip({ label, value, detail }: { label: string; value: number; detail?: string }) {
+  return (
+    <div className="rounded-lg border bg-card p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="text-xl font-semibold tabular-nums">{value}</p>
+      {detail ? <p className="text-xs text-muted-foreground">{detail}</p> : null}
+    </div>
   )
 }
